@@ -1,0 +1,20 @@
+// 变量声明
+let x = 5
+let name = "Orama"
+
+// 函数定义 (使用箭头函数)
+let add = (a, b) => a + b
+
+// 箭头函数自动返回最后一个表达式的值
+let factorial = (n) => 
+  if n <= 1 {
+    1
+  } else {
+    n * factorial(n - 1)
+  }
+
+// 函数组合
+let compose = (f, g) => (x) => f(g(x))
+let double = (x) => x * 2
+let increment = (x) => x + 1
+let doubleAndIncrement = compose(increment, double)

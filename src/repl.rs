@@ -1,29 +1,62 @@
 use crate::lexer;
 use crate::parser;
-use crate::ast::{Expr, Literal, Stmt, Program, BinaryOp, UnaryOp, TypeAnnotation, TypeDefinition};
+use crate::evaluator::Evaluator;
+use crate::ast::Program;
+use crate::stdlib;
+use colored::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use colored::*;
+use crate::ast::Stmt;
+use crate::ast::Expr;
+use crate::runtime::Effect;
+use std::collections::HashMap;
+use crate::ast::TypeDefinition;
+use crate::ast::Literal;
+use crate::ast::TypeAnnotation;
+use crate::ast::BinaryOp;
+use crate::ast::UnaryOp;
 
 pub fn run_repl() {
-    println!("Orama 语言 REPL");
-    println!("输入 '.exit' 退出");
-    println!("输入行尾使用 '\\' 可以自动续行");
+    println!("{}", "Orama 语言 REPL".bright_green().bold());
+    println!("{}", "输入 '.exit' 退出".cyan());
+    println!("{}", "输入行尾使用 '\\' 可以自动续行".cyan());
+    println!("{}", "输入 '.ast' 切换 AST 显示模式".cyan());
+    println!("{}", "输入 '.eval' 切换求值模式".cyan());
 
-    let mut rl = Editor::<(), rustyline::history::FileHistory>::new().unwrap();
+    let mut rl = Editor::<(), rustyline::history::FileHistory>::new().expect("Failed to create line editor");
     let mut input_buffer = String::new();
     let mut continuation = false;
+    let mut show_ast = false;
+    
+    // 创建标准库环境
+    let stdlib_env = stdlib::create_stdlib();
+    let mut evaluator = Evaluator::with_environment(stdlib_env);
 
     loop {
-        let prompt = if continuation { "... " } else { ">>> " };
-        match rl.readline(prompt) {
+        let prompt = if continuation { 
+            "... ".to_string() 
+        } else { 
+            ">>> ".to_string() 
+        };
+        
+        // 使用 rustyline 的 colored prompt 支持
+        match rl.readline_with_initial(&prompt, ("", "")) {
             Ok(line) => {
+                // 添加历史记录，处理可能的错误
                 if let Err(e) = rl.add_history_entry(line.as_str()) {
-                    println!("无法添加历史记录: {:?}", e);
+                    println!("{}: 无法添加历史记录: {:?}", "警告".yellow().bold(), e);
                 }
 
                 if line.trim() == ".exit" {
                     break;
+                } else if line.trim() == ".ast" {
+                    show_ast = !show_ast;
+                    println!("AST 显示模式: {}", if show_ast { "开启".green() } else { "关闭".red() });
+                    continue;
+                } else if line.trim() == ".eval" {
+                    show_ast = false;
+                    println!("求值模式: {}", "开启".green());
+                    continue;
                 }
 
                 // 检查行尾是否有续行符 '\'
@@ -40,16 +73,24 @@ pub fn run_repl() {
                 if !continuation {
                     match lexer::lex(&input_buffer) {
                         Ok(tokens) => {
-                            println!("{}", "词法分析结果:".green().bold());
-                            for token in &tokens {
-                                println!("  {}", token);
-                            }
-                            
-                            // 进行语法分析
                             match parser::parse(tokens) {
-                                Ok(program) => {
-                                    println!("\n{}", "语法分析结果 (AST):".green().bold());
-                                    print_program(&program);
+                                Ok(ast) => {
+                                    if show_ast {
+                                        println!("{}", "AST:".yellow().bold());
+                                        print_ast(&ast);
+                                    } else {
+                                        // 执行代码
+                                        match evaluator.evaluate(&ast) {
+                                            Ok(value) => {
+                                                if !matches!(value, crate::runtime::Value::Null) {
+                                                    println!("{} {}", "=>".bright_blue().bold(), format!("{}", stdlib::format_value(&value)).bright_white());
+                                                }
+                                            },
+                                            Err(e) => {
+                                                println!("{}: {}", "运行时错误".red().bold(), e);
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     println!("{}: {}", "语法错误".red().bold(), e);
@@ -72,15 +113,15 @@ pub fn run_repl() {
                 break;
             }
             Err(err) => {
-                println!("错误: {:?}", err);
+                println!("{}: {:?}", "错误".red().bold(), err);
                 break;
             }
         }
     }
 }
 
-// 格式化输出 Program
-fn print_program(program: &Program) {
+// 保留原有的 print_ast 函数和其他辅助函数
+fn print_ast(program: &Program) {
     for (i, stmt) in program.statements.iter().enumerate() {
         if i > 0 {
             println!();
