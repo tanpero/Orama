@@ -104,6 +104,10 @@ pub enum RuntimeError {
     
     #[error("参数数量不匹配: 期望 {expected}, 实际 {actual}")]
     ArgumentMismatch { expected: usize, actual: usize },
+
+    #[error("索引超出范围: 索引 {index} 超出数组大小 {size}")]
+    IndexOutOfBounds { index: usize, size: usize },
+
     
     #[error("运行时错误: {0}")]
     Generic(String),
@@ -111,3 +115,47 @@ pub enum RuntimeError {
 
 // 运行时结果类型
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
+
+// 处理 Value 类型的比较问题
+
+// 在 Value 枚举中添加自定义比较方法
+impl Value {
+    pub fn is_equal(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a == b,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Null, Value::Null) => true,
+            (Value::Unit, Value::Unit) => true,
+            (Value::Array(a), Value::Array(b)) => {
+                if a.len() != b.len() {
+                    return false;
+                }
+                for (i, item) in a.iter().enumerate() {
+                    if !item.is_equal(&b[i]) {
+                        return false;
+                    }
+                }
+                true
+            },
+            (Value::Object(a), Value::Object(b)) => {
+                if a.len() != b.len() {
+                    return false;
+                }
+                for (key, val) in a {
+                    match b.get(key) {
+                        Some(other_val) => {
+                            if !val.is_equal(other_val) {
+                                return false;
+                            }
+                        },
+                        None => return false,
+                    }
+                }
+                true
+            },
+            // 函数、原生函数和效应不进行比较，总是返回 false
+            _ => false,
+        }
+    }
+}

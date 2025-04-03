@@ -18,3 +18,5 @@ let compose = (f, g) => (x) => f(g(x))
 let double = (x) => x * 2
 let increment = (x) => x + 1
 let doubleAndIncrement = compose(increment, double)
+
+print(doubleAndIncrement(factorial(5)))
