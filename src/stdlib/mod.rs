@@ -45,6 +45,7 @@ fn add_native_fn<F>(
 // 格式化值为字符串
 pub fn format_value(value: &Value) -> String {
     match value {
+        &Value::Unit => "()".to_string(),
         Value::Number(n) => n.to_string(),
         Value::String(s) => s.clone(),
         Value::Boolean(b) => b.to_string(),

@@ -166,6 +166,7 @@ impl Evaluator {
     
     fn evaluate_literal(&mut self, lit: &Literal) -> RuntimeResult<Value> {
         match lit {
+            Literal::Unit => Ok(Value::Unit),
             Literal::Number(n) => Ok(Value::Number(*n)),
             Literal::String(s) => Ok(Value::String(s.clone())),
             Literal::Boolean(b) => Ok(Value::Boolean(*b)),
@@ -285,6 +286,7 @@ impl Evaluator {
     
     fn is_truthy(&self, value: &Value) -> bool {
         match value {
+            Value::Unit => true,
             Value::Boolean(b) => *b,
             Value::Null => false,
             Value::Number(n) => *n != 0.0,

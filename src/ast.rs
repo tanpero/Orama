@@ -36,6 +36,7 @@ pub enum Literal {
     Boolean(bool),
     Array(Vec<Expr>),
     Object(Vec<(String, Expr)>),
+    Unit,
     Null,
 }
 
@@ -140,7 +141,7 @@ pub struct TypeField {
 
 #[derive(Debug, Clone)]
 pub enum TypeAnnotation {
-    Simple(String, Vec<TypeAnnotation>),
+    Simple(String, Option<Vec<TypeAnnotation>>),
     Function(FunctionType),
     Effect(Vec<String>, Box<TypeAnnotation>),
     Array(Box<TypeAnnotation>),

@@ -8,6 +8,7 @@ use crate::ast::ReturnHandler;
 use crate::ast::EffectHandler;
 use crate::ast::EffectOperation;
 use crate::typechecker;
+use crate::parser::type_parser::parse_type_annotation;
 
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     parse_pipe(parser)
@@ -253,6 +254,7 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                 let body = parse_expression(parser)?;
                 return Ok(Expr::Function(Vec::new(), Box::new(body)));
             }
+            return Ok(Expr::Literal(Literal::Unit)); // 返回单元类型
         } else {
             // 修改这里，支持多参数函数定义
             let mut params = Vec::new();
@@ -262,9 +264,16 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                 let name = name.clone();
                 parser.advance();
                 
+                // 解析可选的类型注解
+                let type_annotation = if parser.match_token(&[TokenType::Colon]) {
+                    Some(parse_type_annotation(parser)?)
+                } else {
+                    None
+                };
+                
                 let param = Parameter {
                     name,
-                    type_annotation: None,
+                    type_annotation,
                 };
                 params.push(param);
                 
@@ -274,9 +283,16 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                         let name = name.clone();
                         parser.advance();
                         
+                        // 解析可选的类型注解
+                        let type_annotation = if parser.match_token(&[TokenType::Colon]) {
+                            Some(parse_type_annotation(parser)?)
+                        } else {
+                            None
+                        };
+                        
                         let param = Parameter {
                             name,
-                            type_annotation: None,
+                            type_annotation,
                         };
                         params.push(param);
                     } else {
@@ -290,6 +306,13 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                 }
                 
                 parser.consume(TokenType::RightParen, "Expect ')' after parameters")?;
+                
+                // 解析可选的返回类型注解
+                let return_type_annotation = if parser.match_token(&[TokenType::Colon]) {
+                    Some(parse_type_annotation(parser)?)
+                } else {
+                    None
+                };
                 
                 if parser.match_token(&[TokenType::FatArrow]) {
                     let body = parse_expression(parser)?;
@@ -331,26 +354,7 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
         }
     }
 
-    if parser.match_token(&[TokenType::If]) {
-        return parse_if_expression(parser);
-    }
-
-    if parser.match_token(&[TokenType::LeftBrace]) {
-        return parse_block(parser);
-    }
-
-    if parser.match_token(&[TokenType::Perform]) {
-        return parse_perform(parser);
-    }
-
-    if parser.match_token(&[TokenType::Handle]) {
-        return parse_handle(parser);
-    }
-
-    if parser.match_token(&[TokenType::Match]) {
-        return parse_match(parser);
-    }
-
+    // 添加一个 else 子句，处理所有其他情况
     Err(ParseError::UnexpectedToken {
         expected: "expression".to_string(),
         found: format!("{:?}", parser.peek().token_type),
@@ -671,3 +675,4 @@ fn parse_match(parser: &mut Parser) -> Result<Expr, ParseError> {
     
     Ok(Expr::Match(Box::new(expr), cases))
 }
+

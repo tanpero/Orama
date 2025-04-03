@@ -218,6 +218,7 @@ fn print_expr(expr: &Expr, indent: usize) {
     match expr {
         Expr::Literal(lit) => {
             match lit {
+                Literal::Unit => println!("{}{}", indent_str, "单元值".magenta()),
                 Literal::Number(n) => println!("{}{}: {}", indent_str, "数字".magenta(), n),
                 Literal::String(s) => println!("{}{}: \"{}\"", indent_str, "字符串".magenta(), s),
                 Literal::Boolean(b) => println!("{}{}: {}", indent_str, "布尔值".magenta(), b),
@@ -237,6 +238,7 @@ fn print_expr(expr: &Expr, indent: usize) {
                     println!("{}}}", indent_str);
                 }
                 Literal::Null => println!("{}{}", indent_str, "null".magenta()),
+                Literal::Unit => println!("{}{}", indent_str, "unit".magenta()),
             }
         }
         Expr::Variable(name) => {
@@ -376,15 +378,17 @@ fn print_type_annotation(type_ann: &TypeAnnotation, indent: usize) {
         }
         TypeAnnotation::Simple(name, args) => {
             print!("{}", name.green());
-            if !args.is_empty() {
-                print!("<");
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        print!(", ");
+            if let Some(args) = args {
+                if !args.is_empty() {
+                    print!("<");
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            print!(", ");
+                        }
+                        print_type_annotation(arg, indent);
                     }
-                    print_type_annotation(arg, indent);
+                    print!(">");
                 }
-                print!(">");
             }
         }
         TypeAnnotation::Function(func_type) => {
@@ -401,7 +405,26 @@ fn print_type_annotation(type_ann: &TypeAnnotation, indent: usize) {
             print!("> ");
             print_type_annotation(return_type, indent);
         }
+        TypeAnnotation::Array(elem_type) => {
+            print!("[]");
+            print_type_annotation(elem_type, indent);
+        }
+        TypeAnnotation::Simple(name, args) => {
+            print!("{}", name.green());
+            if let Some(args) = args {
+                if !args.is_empty() {
+                print!("<");
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        print!(", ");
+                    }
+                    print_type_annotation(arg, indent);
+                }
+                print!(">");
+            }
+        }
     }
+}
 }
 
 // 格式化输出 FunctionType

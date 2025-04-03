@@ -6,6 +6,13 @@ pub fn parse_type_annotation(parser: &mut Parser) -> Result<TypeAnnotation, Pars
     // 检查是否是效应类型
     if parser.match_token(&[TokenType::LessThan]) {
         let mut effects = Vec::new();
+
+        if parser.match_token(&[TokenType::LeftBracket]) {
+            let element_type = parse_type_annotation(parser)?;
+            parser.consume(TokenType::RightBracket, "Expect ']' after array element type")?;
+            
+            return Ok(TypeAnnotation::Array(Box::new(element_type)));
+        }
         
         if !parser.check(&TokenType::GreaterThan) {
             loop {
@@ -93,7 +100,7 @@ pub fn parse_type_annotation(parser: &mut Parser) -> Result<TypeAnnotation, Pars
             Vec::new()
         };
         
-        Ok(TypeAnnotation::Simple(type_name, type_args))
+        Ok(TypeAnnotation::Simple(type_name, Some(type_args)))
     } else {
         Err(ParseError::UnexpectedToken {
             expected: "type name".to_string(),

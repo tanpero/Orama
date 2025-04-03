@@ -89,7 +89,7 @@ pub fn parse_effect_declaration(parser: &mut Parser) -> Result<Stmt, ParseError>
         // 简化处理，实际应该解析函数类型
         let function_type = FunctionType {
             params: Vec::new(),
-            return_type: Box::new(TypeAnnotation::Simple("Any".to_string(), Vec::new())),
+            return_type: Box::new(TypeAnnotation::Simple("Any".to_string(), Some(Vec::new()))),
         };
         
         operations.push(EffectSignature {
@@ -361,7 +361,7 @@ fn parse_type_annotation(parser: &mut Parser) -> Result<TypeAnnotation, ParseErr
             Vec::new()
         };
         
-        Ok(TypeAnnotation::Simple(type_name, type_args))
+        Ok(TypeAnnotation::Simple(type_name, Some(type_args)))
     } else {
         Err(ParseError::UnexpectedToken {
             expected: "type name".to_string(),

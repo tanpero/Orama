@@ -16,6 +16,7 @@ pub enum Value {
     NativeFunction(crate::stdlib::NativeFunction),
     Effect(Effect),
     Null,
+    Unit,
 }
 
 // 函数类型
