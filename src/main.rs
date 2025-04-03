@@ -61,3 +61,7 @@ fn run_file(filename: &str) {
         }
     }
 }
+
+// 在文件顶部添加
+#[cfg(test)]
+mod tests;

@@ -1,5 +1,6 @@
 use std::fmt;
 
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     // 字面量
@@ -53,6 +54,7 @@ pub enum BinaryOp {
     GreaterEqual,
     And,
     Or,
+    Access, // 新增：用于属性访问
 }
 
 #[derive(Debug, Clone)]

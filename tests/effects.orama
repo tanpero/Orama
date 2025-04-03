@@ -1,0 +1,60 @@
+// 代数效应测试
+
+// 定义状态效应
+effect State {
+  get: () => Number,
+  set: (value: Number) => ()
+}
+
+// 使用效应的函数
+let counter = () => {
+  let current = perform State.get()
+  perform State.set(current + 1)
+  current
+}
+
+// 处理效应
+let result = handle {
+  let a = counter()
+  let b = counter()
+  let c = counter()
+  [a, b, c]
+} {
+  effect State {
+    get: () => {
+      let state = 0
+      resume(state)
+    },
+    set: (value) => {
+      resume((), value)
+    }
+  }
+}
+
+// 定义异常效应
+effect Exception {
+  throw: (message: String) => Number
+}
+
+// 使用异常效应
+let safeDivide = (a, b) => {
+  if b == 0 {
+    perform Exception.throw("Division by zero")
+  } else {
+    a / b
+  }
+}
+
+// 处理异常效应
+let divResult = handle {
+  [safeDivide(10, 2), safeDivide(10, 0), safeDivide(8, 4)]
+} {
+  effect Exception {
+    throw: (message) => {
+      resume(0)
+    }
+  }
+}
+
+// 返回结果
+[result, divResult]

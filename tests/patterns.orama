@@ -1,0 +1,42 @@
+// 模式匹配测试
+
+// 定义代数数据类型
+type List<T> = | Nil() | Cons(T, List<T>)
+
+// 创建列表
+let makeList = (...items) => {
+  let result = Nil()
+  let i = items.length - 1
+  while i >= 0 {
+    result = Cons(items[i], result)
+    i = i - 1
+  }
+  result
+}
+
+// 使用模式匹配的函数
+let sum = (list) => match list {
+  Nil() => 0,
+  Cons(head, tail) => head + sum(tail)
+}
+
+let length = (list) => match list {
+  Nil() => 0,
+  Cons(_, tail) => 1 + length(tail)
+}
+
+let map = (list, f) => match list {
+  Nil() => Nil(),
+  Cons(head, tail) => Cons(f(head), map(tail, f))
+}
+
+// 测试
+let list1 = makeList(1, 2, 3, 4, 5)
+let list2 = map(list1, (x) => x * 2)
+
+// 返回结果
+[
+  sum(list1),
+  length(list1),
+  sum(list2)
+]

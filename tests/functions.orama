@@ -1,0 +1,35 @@
+// 函数和闭包测试
+
+// 递归函数
+let factorial = (n) => 
+  if n <= 1 {
+    1
+  } else {
+    n * factorial(n - 1)
+  }
+
+// 高阶函数
+let apply = (f, x) => f(x)
+let double = (x) => x * 2
+
+// 闭包
+let makeCounter = () => {
+  let count = 0
+  () => {
+    count = count + 1
+    count
+  }
+}
+
+// 创建计数器
+let counter1 = makeCounter()
+let counter2 = makeCounter()
+
+// 测试结果
+[
+  factorial(5),
+  apply(double, 10),
+  counter1(),
+  counter1(),
+  counter2()
+]

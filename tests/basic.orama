@@ -1,0 +1,22 @@
+// 基本语法测试
+let x = 5
+let y = 10
+let z = x + y
+
+// 条件表达式
+let result = if z > 10 {
+  "Greater than 10"
+} else {
+  "Less than or equal to 10"
+}
+
+// 函数定义
+let add = (a, b) => a + b
+let multiply = (a, b) => a * b
+
+// 函数调用
+let sum = add(x, y)
+let product = multiply(x, y)
+
+// 返回最终结果
+[result, sum, product]

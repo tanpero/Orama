@@ -2,6 +2,12 @@ use crate::ast::{BinaryOp, Expr, Literal, Parameter, UnaryOp};
 use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
 
+use crate::ast::MatchCase;
+use crate::ast::Pattern;
+use crate::ast::ReturnHandler;
+use crate::ast::EffectHandler;
+use crate::ast::EffectOperation;
+
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     parse_pipe(parser)
 }
@@ -138,7 +144,12 @@ fn parse_call(parser: &mut Parser) -> Result<Expr, ParseError> {
         } else if parser.match_token(&[TokenType::Dot]) {
             let name = parser.consume(TokenType::Identifier("".to_string()), "Expect property name after '.'")?;
             if let TokenType::Identifier(name) = &name.token_type {
-                expr = Expr::Variable(name.clone()); // 简化处理，实际应该是属性访问
+                // 修改这里，实现属性访问而不是简单的变量引用
+                expr = Expr::Binary(
+                    Box::new(expr),
+                    BinaryOp::Access,  // 使用 Dot 操作符来表示属性访问
+                    Box::new(Expr::Variable(name.clone()))
+                );
             } else {
                 unreachable!();
             }
@@ -206,29 +217,80 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                 return Ok(Expr::Function(Vec::new(), Box::new(body)));
             }
         } else {
-            // 带参数的函数或分组表达式
-            let expr = parse_expression(parser)?;
-            parser.consume(TokenType::RightParen, "Expect ')' after expression")?;
+            // 修改这里，支持多参数函数定义
+            let mut params = Vec::new();
             
-            if parser.match_token(&[TokenType::FatArrow]) {
-                // 这是一个函数定义
-                if let Expr::Variable(name) = expr {
-                    let param = Parameter {
-                        name,
-                        type_annotation: None,
-                    };
-                    let body = parse_expression(parser)?;
-                    return Ok(Expr::Function(vec![param], Box::new(body)));
-                } else {
-                    return Err(ParseError::InvalidSyntax(
-                        "Expected parameter name".to_string(),
-                        parser.previous().line,
-                        parser.previous().column,
-                    ));
+            // 解析第一个参数
+            if let TokenType::Identifier(name) = &parser.peek().token_type {
+                let name = name.clone();
+                parser.advance();
+                
+                let param = Parameter {
+                    name,
+                    type_annotation: None,
+                };
+                params.push(param);
+                
+                // 解析后续参数
+                while parser.match_token(&[TokenType::Comma]) {
+                    if let TokenType::Identifier(name) = &parser.peek().token_type {
+                        let name = name.clone();
+                        parser.advance();
+                        
+                        let param = Parameter {
+                            name,
+                            type_annotation: None,
+                        };
+                        params.push(param);
+                    } else {
+                        return Err(ParseError::UnexpectedToken {
+                            expected: "parameter name".to_string(),
+                            found: format!("{:?}", parser.peek().token_type),
+                            line: parser.peek().line,
+                            column: parser.peek().column,
+                        });
+                    }
                 }
+                
+                parser.consume(TokenType::RightParen, "Expect ')' after parameters")?;
+                
+                if parser.match_token(&[TokenType::FatArrow]) {
+                    let body = parse_expression(parser)?;
+                    return Ok(Expr::Function(params, Box::new(body)));
+                } else {
+                    // 不是函数定义，回退到表达式解析
+                    return Err(ParseError::UnexpectedToken {
+                        expected: "'=>'".to_string(),
+                        found: format!("{:?}", parser.peek().token_type),
+                        line: parser.peek().line,
+                        column: parser.peek().column,
+                    });
+                }
+            } else {
+                // 不是参数名，可能是分组表达式
+                let expr = parse_expression(parser)?;
+                parser.consume(TokenType::RightParen, "Expect ')' after expression")?;
+                
+                if parser.match_token(&[TokenType::FatArrow]) {
+                    // 尝试将表达式作为单参数处理
+                    if let Expr::Variable(name) = expr {
+                        let param = Parameter {
+                            name,
+                            type_annotation: None,
+                        };
+                        let body = parse_expression(parser)?;
+                        return Ok(Expr::Function(vec![param], Box::new(body)));
+                    } else {
+                        return Err(ParseError::InvalidSyntax(
+                            "Expected parameter name".to_string(),
+                            parser.previous().line,
+                            parser.previous().column,
+                        ));
+                    }
+                }
+                
+                return Ok(expr);
             }
-            
-            return Ok(expr);
         }
     }
 
@@ -347,25 +409,227 @@ fn parse_perform(parser: &mut Parser) -> Result<Expr, ParseError> {
 }
 
 fn parse_handle(parser: &mut Parser) -> Result<Expr, ParseError> {
-    // 这里简化了处理，实际应该更复杂
+    // 解析被处理的表达式
     let expr = parse_expression(parser)?;
     
     parser.consume(TokenType::LeftBrace, "Expect '{' after expression in handle")?;
     
-    // 简化处理，实际应该解析效应处理器
+    // 解析效应处理器
+    let mut handlers = Vec::new();
+    let mut return_handler = None;
+    
+    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+        if parser.match_token(&[TokenType::Effect]) {
+            // 解析效应处理器
+            let effect_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
+                name.clone()
+            } else {
+                return Err(ParseError::UnexpectedToken {
+                    expected: "effect name".to_string(),
+                    found: format!("{:?}", parser.peek().token_type),
+                    line: parser.peek().line,
+                    column: parser.peek().column,
+                });
+            };
+            parser.advance();
+            
+            parser.consume(TokenType::LeftBrace, "Expect '{' after effect name")?;
+            
+            let mut operations = Vec::new();
+            
+            while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+                // 解析操作名
+                let op_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
+                    name.clone()
+                } else {
+                    return Err(ParseError::UnexpectedToken {
+                        expected: "operation name".to_string(),
+                        found: format!("{:?}", parser.peek().token_type),
+                        line: parser.peek().line,
+                        column: parser.peek().column,
+                    });
+                };
+                parser.advance();
+                
+                parser.consume(TokenType::Colon, "Expect ':' after operation name")?;
+                parser.consume(TokenType::LeftParen, "Expect '(' after ':'")?;
+                
+                // 解析参数
+                let mut params = Vec::new();
+                if !parser.check(&TokenType::RightParen) {
+                    loop {
+                        let param_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
+                            name.clone()
+                        } else {
+                            return Err(ParseError::UnexpectedToken {
+                                expected: "parameter name".to_string(),
+                                found: format!("{:?}", parser.peek().token_type),
+                                line: parser.peek().line,
+                                column: parser.peek().column,
+                            });
+                        };
+                        parser.advance();
+                        
+                        // 这里可以添加对类型注解的支持
+                        let param = Parameter {
+                            name: param_name,
+                            type_annotation: None,
+                        };
+                        params.push(param);
+                        
+                        if !parser.match_token(&[TokenType::Comma]) {
+                            break;
+                        }
+                    }
+                }
+                
+                parser.consume(TokenType::RightParen, "Expect ')' after parameters")?;
+                parser.consume(TokenType::FatArrow, "Expect '=>' after parameters")?;
+                
+                // 解析操作体
+                let body = parse_expression(parser)?;
+                
+                operations.push(EffectOperation {
+                    name: op_name,
+                    params,
+                    body,
+                });
+                
+                // 如果有逗号，消费它
+                parser.match_token(&[TokenType::Comma]);
+            }
+            
+            parser.consume(TokenType::RightBrace, "Expect '}' after effect operations")?;
+            
+            handlers.push(EffectHandler {
+                effect_name,
+                operations,
+            });
+        } else if parser.match_token(&[TokenType::Return]) {
+            // 解析返回处理器
+            parser.consume(TokenType::Colon, "Expect ':' after 'return'")?;
+            parser.consume(TokenType::LeftParen, "Expect '(' after ':'")?;
+            
+            let param_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
+                name.clone()
+            } else {
+                return Err(ParseError::UnexpectedToken {
+                    expected: "parameter name".to_string(),
+                    found: format!("{:?}", parser.peek().token_type),
+                    line: parser.peek().line,
+                    column: parser.peek().column,
+                });
+            };
+            parser.advance();
+            
+            parser.consume(TokenType::RightParen, "Expect ')' after parameter")?;
+            parser.consume(TokenType::FatArrow, "Expect '=>' after parameter")?;
+            
+            let body = parse_expression(parser)?;
+            
+            return_handler = Some(Box::new(ReturnHandler {
+                param: param_name,
+                body: Box::new(body),
+            }));
+            
+            // 如果有逗号，消费它
+            parser.match_token(&[TokenType::Comma]);
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "'effect' or 'return'".to_string(),
+                found: format!("{:?}", parser.peek().token_type),
+                line: parser.peek().line,
+                column: parser.peek().column,
+            });
+        }
+    }
+    
     parser.consume(TokenType::RightBrace, "Expect '}' after handle body")?;
     
-    Ok(Expr::Handle(Box::new(expr), Vec::new(), None))
+    Ok(Expr::Handle(Box::new(expr), handlers, return_handler))
 }
 
 fn parse_match(parser: &mut Parser) -> Result<Expr, ParseError> {
-    // 这里简化了处理，实际应该更复杂
+    // 解析被匹配的表达式
     let expr = parse_expression(parser)?;
     
     parser.consume(TokenType::LeftBrace, "Expect '{' after expression in match")?;
     
-    // 简化处理，实际应该解析匹配分支
-    parser.consume(TokenType::RightBrace, "Expect '}' after match body")?;
+    // 解析匹配分支
+    let mut cases = Vec::new();
     
-    Ok(Expr::Match(Box::new(expr), Vec::new()))
+    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+        // 解析模式
+        let pattern_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
+            name.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "pattern name".to_string(),
+                found: format!("{:?}", parser.peek().token_type),
+                line: parser.peek().line,
+                column: parser.peek().column,
+            });
+        };
+        parser.advance();
+        
+        // 解析模式参数
+        let pattern_params = if parser.match_token(&[TokenType::LeftParen]) {
+            let mut params = Vec::new();
+            
+            if !parser.check(&TokenType::RightParen) {
+                loop {
+                    // 递归解析嵌套模式
+                    let sub_pattern_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
+                        name.clone()
+                    } else {
+                        return Err(ParseError::UnexpectedToken {
+                            expected: "pattern parameter name".to_string(),
+                            found: format!("{:?}", parser.peek().token_type),
+                            line: parser.peek().line,
+                            column: parser.peek().column,
+                        });
+                    };
+                    parser.advance();
+                    
+                    // 简化处理，不支持嵌套模式参数
+                    params.push(Pattern {
+                        name: sub_pattern_name,
+                        params: None,
+                    });
+                    
+                    if !parser.match_token(&[TokenType::Comma]) {
+                        break;
+                    }
+                }
+            }
+            
+            parser.consume(TokenType::RightParen, "Expect ')' after pattern parameters")?;
+            
+            Some(params)
+        } else {
+            None
+        };
+        
+        let pattern = Pattern {
+            name: pattern_name,
+            params: pattern_params,
+        };
+        
+        parser.consume(TokenType::FatArrow, "Expect '=>' after pattern")?;
+        
+        // 解析分支体
+        let body = parse_expression(parser)?;
+        
+        cases.push(MatchCase {
+            pattern,
+            body,
+        });
+        
+        // 消费逗号（如果有）
+        parser.match_token(&[TokenType::Comma]);
+    }
+    
+    parser.consume(TokenType::RightBrace, "Expect '}' after match cases")?;
+    
+    Ok(Expr::Match(Box::new(expr), cases))
 }

@@ -1,0 +1,53 @@
+// 类型系统测试
+
+// 定义简单类型
+type Point = {
+  x: Number,
+  y: Number
+}
+
+// 定义泛型类型
+type Option<T> = | Some(T) | None()
+type Result<T, E> = | Ok(T) | Err(E)
+
+// 使用类型
+let createPoint = (x, y) => {
+  x: x,
+  y: y
+}
+
+let distance = (p1, p2) => {
+  let dx = p2.x - p1.x
+  let dy = p2.y - p1.y
+  (dx * dx + dy * dy) ** 0.5
+}
+
+// 使用泛型类型
+let safeDivide = (a, b) => {
+  if b == 0 {
+    Err("Division by zero")
+  } else {
+    Ok(a / b)
+  }
+}
+
+// 测试
+let p1 = createPoint(0, 0)
+let p2 = createPoint(3, 4)
+let dist = distance(p1, p2)
+
+let div1 = safeDivide(10, 2)
+let div2 = safeDivide(10, 0)
+
+// 模式匹配
+let getOrDefault = (result, default) => match result {
+  Ok(value) => value,
+  Err(_) => default
+}
+
+// 返回结果
+[
+  dist,
+  getOrDefault(div1, 0),
+  getOrDefault(div2, 0)
+]
