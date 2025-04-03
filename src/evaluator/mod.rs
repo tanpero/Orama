@@ -62,7 +62,7 @@ impl Evaluator {
         }
     }
     
-    fn evaluate_expression(&mut self, expr: &Expr) -> RuntimeResult<Value> {
+    pub fn evaluate_expression(&mut self, expr: &Expr) -> RuntimeResult<Value> {
         match expr {
             Expr::Literal(lit) => self.evaluate_literal(lit),
             Expr::Variable(name) => {
@@ -245,7 +245,7 @@ impl Evaluator {
         }
     }
     
-    fn call_function(&mut self, callee: Value, args: Vec<Value>) -> RuntimeResult<Value> {
+    pub fn call_function(&mut self, callee: Value, args: Vec<Value>) -> RuntimeResult<Value> {
         match callee {
             Value::Function(function) => {
                 if function.params.len() != args.len() {

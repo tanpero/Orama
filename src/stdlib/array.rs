@@ -215,4 +215,221 @@ pub fn register(env: &Rc<RefCell<Environment>>) {
             }
         },
     );
+
+    // map 函数：对数组中的每个元素应用一个函数，返回新数组
+    super::add_native_fn(
+        env,
+        "map",
+        vec!["array", "callback"],
+        |args, env| {
+            if args.len() < 2 {
+                return Err(RuntimeError::ArgumentMismatch { expected: 2, actual: args.len() });
+            }
+            
+            if let Value::Array(array) = &args[0] {
+                match &args[1] {
+                    Value::Function(_) | Value::NativeFunction(_) => {
+                        let mut result = Vec::with_capacity(array.len());
+                        
+                        for item in array {
+                            // 直接调用函数，而不是通过 evaluator
+                            match &args[1] {
+                                Value::Function(func) => {
+                                    // 创建一个临时环境
+                                    let mut temp_env = Environment::with_enclosing(Rc::clone(&func.closure));
+                                    
+                                    // 绑定参数
+                                    if func.params.len() > 0 {
+                                        temp_env.define(func.params[0].clone(), item.clone());
+                                    }
+                                    
+                                    // 创建一个临时的 evaluator 来执行函数
+                                    let mut temp_evaluator = crate::evaluator::Evaluator::with_environment(
+                                        Rc::new(RefCell::new(temp_env))
+                                    );
+                                    
+                                    // 执行函数体
+                                    let mapped_value = temp_evaluator.evaluate_expression(&func.body)?;
+                                    result.push(mapped_value);
+                                },
+                                Value::NativeFunction(native_fn) => {
+                                    let mapped_value = (native_fn.func)(vec![item.clone()], Rc::clone(&env))?;
+                                    result.push(mapped_value);
+                                },
+                                _ => unreachable!(),
+                            }
+                        }
+                        
+                        Ok(Value::Array(result))
+                    },
+                    _ => Err(RuntimeError::TypeError("map 函数的第二个参数必须是函数".to_string()))
+                }
+            } else {
+                Err(RuntimeError::TypeError("map 函数的第一个参数必须是数组".to_string()))
+            }
+        },
+    );
+
+    // filter 函数：返回数组中满足条件的元素
+    super::add_native_fn(
+        env,
+        "filter",
+        vec!["array", "callback"],
+        |args, env| {
+            if args.len() < 2 {
+                return Err(RuntimeError::ArgumentMismatch { expected: 2, actual: args.len() });
+            }
+            
+            if let Value::Array(array) = &args[0] {
+                match &args[1] {
+                    Value::Function(_) | Value::NativeFunction(_) => {
+                        let mut result = Vec::new();
+                        
+                        for item in array {
+                            // 直接调用函数，而不是通过 evaluator
+                            let condition = match &args[1] {
+                                Value::Function(func) => {
+                                    // 创建一个临时环境
+                                    let mut temp_env = Environment::with_enclosing(Rc::clone(&func.closure));
+                                    
+                                    // 绑定参数
+                                    if func.params.len() > 0 {
+                                        temp_env.define(func.params[0].clone(), item.clone());
+                                    }
+                                    
+                                    // 创建一个临时的 evaluator 来执行函数
+                                    let mut temp_evaluator = crate::evaluator::Evaluator::with_environment(
+                                        Rc::new(RefCell::new(temp_env))
+                                    );
+                                    
+                                    // 执行函数体
+                                    temp_evaluator.evaluate_expression(&func.body)?
+                                },
+                                Value::NativeFunction(native_fn) => {
+                                    (native_fn.func)(vec![item.clone()], Rc::clone(&env))?
+                                },
+                                _ => unreachable!(),
+                            };
+                            
+                            if let Value::Boolean(true) = condition {
+                                result.push(item.clone());
+                            }
+                        }
+                        
+                        Ok(Value::Array(result))
+                    },
+                    _ => Err(RuntimeError::TypeError("filter 函数的第二个参数必须是函数".to_string()))
+                }
+            } else {
+                Err(RuntimeError::TypeError("filter 函数的第一个参数必须是数组".to_string()))
+            }
+        },
+    );
+
+    // reduce 函数：将数组归约为单个值
+    super::add_native_fn(
+        env,
+        "reduce",
+        vec!["array", "callback", "initial"],
+        |args, env| {
+            if args.len() < 3 {
+                return Err(RuntimeError::ArgumentMismatch { expected: 3, actual: args.len() });
+            }
+            
+            if let Value::Array(array) = &args[0] {
+                match &args[1] {
+                    Value::Function(_) | Value::NativeFunction(_) => {
+                        let mut accumulator = args[2].clone();
+                        
+                        for item in array {
+                            // 直接调用函数，而不是通过 evaluator
+                            accumulator = match &args[1] {
+                                Value::Function(func) => {
+                                    // 创建一个临时环境
+                                    let mut temp_env = Environment::with_enclosing(Rc::clone(&func.closure));
+                                    
+                                    // 绑定参数
+                                    if func.params.len() > 0 {
+                                        temp_env.define(func.params[0].clone(), accumulator);
+                                    }
+                                    if func.params.len() > 1 {
+                                        temp_env.define(func.params[1].clone(), item.clone());
+                                    }
+                                    
+                                    // 创建一个临时的 evaluator 来执行函数
+                                    let mut temp_evaluator = crate::evaluator::Evaluator::with_environment(
+                                        Rc::new(RefCell::new(temp_env))
+                                    );
+                                    
+                                    // 执行函数体
+                                    temp_evaluator.evaluate_expression(&func.body)?
+                                },
+                                Value::NativeFunction(native_fn) => {
+                                    (native_fn.func)(vec![accumulator, item.clone()], Rc::clone(&env))?
+                                },
+                                _ => unreachable!(),
+                            };
+                        }
+                        
+                        Ok(accumulator)
+                    },
+                    _ => Err(RuntimeError::TypeError("reduce 函数的第二个参数必须是函数".to_string()))
+                }
+            } else {
+                Err(RuntimeError::TypeError("reduce 函数的第一个参数必须是数组".to_string()))
+            }
+        },
+    );
+
+    // each 函数：对数组中的每个元素执行一个函数，不返回新数组
+    super::add_native_fn(
+        env,
+        "each",
+        vec!["array", "callback"],
+        |args, env| {
+            if args.len() < 2 {
+                return Err(RuntimeError::ArgumentMismatch { expected: 2, actual: args.len() });
+            }
+            
+            if let Value::Array(array) = &args[0] {
+                match &args[1] {
+                    Value::Function(_) | Value::NativeFunction(_) => {
+                        for item in array {
+                            // 直接调用函数，而不是通过 evaluator
+                            match &args[1] {
+                                Value::Function(func) => {
+                                    // 创建一个临时环境
+                                    let mut temp_env = Environment::with_enclosing(Rc::clone(&func.closure));
+                                    
+                                    // 绑定参数
+                                    if func.params.len() > 0 {
+                                        temp_env.define(func.params[0].clone(), item.clone());
+                                    }
+                                    
+                                    // 创建一个临时的 evaluator 来执行函数
+                                    let mut temp_evaluator = crate::evaluator::Evaluator::with_environment(
+                                        Rc::new(RefCell::new(temp_env))
+                                    );
+                                    
+                                    // 执行函数体，忽略返回值
+                                    temp_evaluator.evaluate_expression(&func.body)?;
+                                },
+                                Value::NativeFunction(native_fn) => {
+                                    // 调用原生函数，忽略返回值
+                                    (native_fn.func)(vec![item.clone()], Rc::clone(&env))?;
+                                },
+                                _ => unreachable!(),
+                            }
+                        }
+                        
+                        // 返回原数组
+                        Ok(args[0].clone())
+                    },
+                    _ => Err(RuntimeError::TypeError("each 函数的第二个参数必须是函数".to_string()))
+                }
+            } else {
+                Err(RuntimeError::TypeError("each 函数的第一个参数必须是数组".to_string()))
+            }
+        },
+    );
 }
