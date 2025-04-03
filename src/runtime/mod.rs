@@ -20,9 +20,12 @@ pub enum Value {
 }
 
 // 函数类型
+// 在 Function 结构体中添加类型信息字段
 #[derive(Clone, Debug)]
 pub struct Function {
     pub params: Vec<String>,
+    pub param_types: Vec<Option<String>>, // 参数类型（如果有）
+    pub return_type: Option<String>,      // 返回类型（如果有）
     pub body: Rc<Expr>,
     pub closure: Rc<RefCell<Environment>>,
 }

@@ -45,6 +45,8 @@ impl Evaluator {
             Stmt::FunctionDecl(name, params, body) => {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
                 let function = Function {
+                    param_types: Vec::new(), // 初始化参数类型为空向量
+                    return_type: None,       // 初始化返回类型为 None
                     params: param_names,
                     body: Rc::new(body.clone()),
                     closure: Rc::clone(&self.environment),
@@ -92,6 +94,8 @@ impl Evaluator {
             Expr::Function(params, body) => {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
                 let function = Function {
+                    param_types: Vec::new(), // 初始化参数类型为空向量
+                    return_type: None,       // 初始化返回类型为 None
                     params: param_names,
                     body: Rc::new(*body.clone()),
                     closure: Rc::clone(&self.environment),

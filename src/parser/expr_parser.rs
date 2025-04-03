@@ -224,6 +224,10 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     if parser.match_token(&[TokenType::Null]) {
         return Ok(Expr::Literal(Literal::Null));
     }
+    // 添加对 if 表达式的支持
+    if parser.match_token(&[TokenType::If]) {
+        return parse_if_expression(parser);
+    }
 
     if let TokenType::Number(n) = parser.peek().token_type {
         parser.advance();
