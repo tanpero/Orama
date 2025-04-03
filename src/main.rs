@@ -6,6 +6,7 @@ mod runtime;
 mod stdlib;
 mod repl;
 mod token;
+mod typechecker;
 
 use std::env;
 use std::fs;

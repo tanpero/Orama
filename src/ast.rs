@@ -143,6 +143,7 @@ pub enum TypeAnnotation {
     Simple(String, Vec<TypeAnnotation>),
     Function(FunctionType),
     Effect(Vec<String>, Box<TypeAnnotation>),
+    Array(Box<TypeAnnotation>),
 }
 
 #[derive(Debug, Clone)]

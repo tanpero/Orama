@@ -59,6 +59,14 @@ pub fn parse_type_annotation(parser: &mut Parser) -> Result<TypeAnnotation, Pars
         }));
     }
     
+    // 检查是否是数组类型
+    if parser.match_token(&[TokenType::LeftBracket]) {
+        let element_type = parse_type_annotation(parser)?;
+        parser.consume(TokenType::RightBracket, "Expect ']' after array element type")?;
+        
+        return Ok(TypeAnnotation::Array(Box::new(element_type)));
+    }
+    
     // 简单类型
     if let TokenType::Identifier(name) = &parser.peek().token_type {
         let type_name = name.clone();

@@ -8,8 +8,6 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use crate::ast::Stmt;
 use crate::ast::Expr;
-use crate::runtime::Effect;
-use std::collections::HashMap;
 use crate::ast::TypeDefinition;
 use crate::ast::Literal;
 use crate::ast::TypeAnnotation;
@@ -73,6 +71,7 @@ pub fn run_repl() {
                 if !continuation {
                     match lexer::lex(&input_buffer) {
                         Ok(tokens) => {
+                            // 在 match parser::parse(tokens) 的错误处理部分
                             match parser::parse(tokens) {
                                 Ok(ast) => {
                                     if show_ast {
@@ -93,7 +92,13 @@ pub fn run_repl() {
                                     }
                                 }
                                 Err(e) => {
-                                    println!("{}: {}", "语法错误".red().bold(), e);
+                                    println!("{}: {}", "解析错误".red().bold(), e);
+                                    if let parser::ParseError::InvalidSyntax(msg, _, _) = &e {
+                                        if msg.contains("数组类型检查错误") {
+                                            println!("{}: 数组中的所有元素必须是同一类型", "提示".yellow().bold());
+                                        }
+                                    }
+                                    input_buffer.clear();
                                 }
                             }
                         }
@@ -365,6 +370,10 @@ fn print_expr(expr: &Expr, indent: usize) {
 fn print_type_annotation(type_ann: &TypeAnnotation, indent: usize) {
     let indent_str = "  ".repeat(indent);
     match type_ann {
+        TypeAnnotation::Array(elem_type) => {
+            print!("[]");
+            print_type_annotation(elem_type, indent);
+        }
         TypeAnnotation::Simple(name, args) => {
             print!("{}", name.green());
             if !args.is_empty() {

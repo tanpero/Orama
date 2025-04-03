@@ -1,4 +1,4 @@
-use crate::runtime::{Value, Environment, RuntimeResult, RuntimeError};
+use crate::runtime::{Value, Environment, RuntimeError};
 use std::rc::Rc;
 use std::cell::RefCell;
 

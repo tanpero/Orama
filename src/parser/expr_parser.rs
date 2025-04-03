@@ -7,6 +7,7 @@ use crate::ast::Pattern;
 use crate::ast::ReturnHandler;
 use crate::ast::EffectHandler;
 use crate::ast::EffectOperation;
+use crate::typechecker;
 
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     parse_pipe(parser)
@@ -183,6 +184,35 @@ fn finish_call(parser: &mut Parser, callee: Expr) -> Result<Expr, ParseError> {
     Ok(Expr::Call(Box::new(callee), arguments))
 }
 
+fn parse_array_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
+    let mut elements = Vec::new();
+    
+    if !parser.check(&TokenType::RightBracket) {
+        loop {
+            elements.push(parse_expression(parser)?);
+            
+            if !parser.match_token(&[TokenType::Comma]) {
+                break;
+            }
+        }
+    }
+    
+    parser.consume(TokenType::RightBracket, "Expect ']' after array elements")?;
+    
+    // 进行类型检查
+    let array_literal = Literal::Array(elements.clone());
+    match typechecker::check_literal(&array_literal) {
+        Ok(_) => Ok(Expr::Literal(array_literal)),
+        Err(err) => {
+            Err(ParseError::InvalidSyntax(
+                format!("数组类型检查错误: {}", err),
+                parser.previous().line,
+                parser.previous().column,
+            ))
+        }
+    }
+}
+
 fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     if parser.match_token(&[TokenType::False]) {
         return Ok(Expr::Literal(Literal::Boolean(false)));
@@ -209,6 +239,11 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
         let name = name.clone();
         parser.advance();
         return Ok(Expr::Variable(name));
+    }
+
+    // 添加对数组字面量的支持
+    if parser.match_token(&[TokenType::LeftBracket]) {
+        return parse_array_literal(parser);
     }
 
     if parser.match_token(&[TokenType::LeftParen]) {

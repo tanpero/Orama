@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-use crate::runtime::{Value, Function, Environment, RuntimeResult, RuntimeError};
+use crate::runtime::{Value, Environment, RuntimeResult};
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::ast::Expr;
 
 use std::fmt;
 

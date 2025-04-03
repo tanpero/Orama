@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::ast::{Expr, Stmt, Literal, BinaryOp, UnaryOp};
+use crate::ast::{Expr};
 
 // 运行时值类型
 // 在 Value 枚举中添加 NativeFunction 变体
