@@ -108,6 +108,8 @@ pub enum RuntimeError {
     #[error("索引超出范围: 索引 {index} 超出数组大小 {size}")]
     IndexOutOfBounds { index: usize, size: usize },
 
+    #[error("无效的操作: {0}")]
+    IOError(String),
     
     #[error("运行时错误: {0}")]
     Generic(String),

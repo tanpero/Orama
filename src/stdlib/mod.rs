@@ -9,6 +9,7 @@ mod stdio;
 mod math;
 mod text;
 mod array;
+mod file;  // 添加文件模块
 
 pub fn create_stdlib() -> Rc<RefCell<Environment>> {
     let env = Rc::new(RefCell::new(Environment::new()));
@@ -18,6 +19,7 @@ pub fn create_stdlib() -> Rc<RefCell<Environment>> {
     math::register(&env);
     text::register(&env);
     array::register(&env);
+    file::register(&env);  // 注册文件模块
     
     env
 }
