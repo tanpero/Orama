@@ -1,0 +1,124 @@
+/* Orama 语言 EBNF 语法定义 */
+
+/* 程序结构 */
+Program ::= Statement*
+
+/* 语句 */
+Statement ::= VariableDeclaration
+            | FunctionDeclaration
+            | EffectDeclaration
+            | TypeDeclaration
+            | Expression
+
+/* 变量声明 */
+VariableDeclaration ::= "let" Identifier "=" Expression
+
+/* 函数声明 */
+FunctionDeclaration ::= "let" Identifier "=" FunctionExpression
+
+/* 函数表达式 */
+FunctionExpression ::= "(" ParameterList? ")" "=>" (Expression | Block)
+ParameterList ::= Parameter ("," Parameter)*
+Parameter ::= Identifier (":" TypeAnnotation)?
+
+/* 代数效应声明 */
+EffectDeclaration ::= "effect" Identifier ("<" TypeParameters ">")?
+                      "{" EffectOperationList "}"
+EffectOperationList ::= EffectOperation ("," EffectOperation)*
+EffectOperation ::= Identifier ":" FunctionType
+
+/* 类型声明 */
+TypeDeclaration ::= "type" Identifier ("<" TypeParameters ">")? "=" TypeDefinition
+TypeDefinition ::= TypeUnion | TypeRecord
+TypeUnion ::= "|" TypeVariant ("|" TypeVariant)*
+TypeVariant ::= Identifier ("(" ParameterList? ")")?
+TypeRecord ::= "{" TypeField ("," TypeField)* "}"
+TypeField ::= Identifier ":" TypeAnnotation
+
+/* 表达式 */
+Expression ::= Literal
+             | Identifier
+             | FunctionExpression
+             | FunctionApplication
+             | BinaryOperation
+             | UnaryOperation
+             | ConditionalExpression
+             | MatchExpression
+             | PerformExpression
+             | HandleExpression
+             | BlockExpression
+             | PipeExpression
+
+/* 字面量 */
+Literal ::= NumberLiteral
+          | StringLiteral
+          | BooleanLiteral
+          | ArrayLiteral
+          | ObjectLiteral
+          | NullLiteral
+
+NumberLiteral ::= Digit+ ("." Digit+)?
+StringLiteral ::= '"' StringCharacter* '"'
+BooleanLiteral ::= "true" | "false"
+ArrayLiteral ::= "[" (Expression ("," Expression)*)? "]"
+ObjectLiteral ::= "{" (ObjectField ("," ObjectField)*)? "}"
+ObjectField ::= Identifier ":" Expression
+NullLiteral ::= "null"
+
+/* 函数应用 */
+FunctionApplication ::= Expression "(" ArgumentList? ")"
+ArgumentList ::= Expression ("," Expression)*
+
+/* 二元操作 */
+BinaryOperation ::= Expression Operator Expression
+Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||"
+
+/* 一元操作 */
+UnaryOperation ::= UnaryOperator Expression
+UnaryOperator ::= "!" | "-"
+
+/* 条件表达式 */
+ConditionalExpression ::= "if" Expression Block ("else" (Block | ConditionalExpression))?
+
+/* 匹配表达式 */
+MatchExpression ::= "match" Expression "{" MatchCase+ "}"
+MatchCase ::= Pattern "=>" Expression ","
+Pattern ::= Identifier ("(" PatternList? ")")?
+PatternList ::= Pattern ("," Pattern)*
+
+/* 代数效应操作 */
+PerformExpression ::= "perform" Identifier "." Identifier "(" ArgumentList? ")"
+
+/* 代数效应处理 */
+HandleExpression ::= "handle" Expression "{" EffectHandlerList "}"
+EffectHandlerList ::= EffectHandler+
+EffectHandler ::= "effect" Identifier "{" EffectHandlerOperation+ "}" | ReturnHandler
+EffectHandlerOperation ::= Identifier ":" "(" ParameterList? ")" "=>" Expression
+ReturnHandler ::= "return" ":" "(" Identifier ")" "=>" Expression
+
+/* 块表达式 */
+BlockExpression ::= Block
+Block ::= "{" Statement* Expression? "}"
+
+/* 管道表达式 */
+PipeExpression ::= Expression "|>" Expression
+
+/* 类型注解 */
+TypeAnnotation ::= SimpleType | FunctionType | EffectType
+SimpleType ::= Identifier ("<" TypeAnnotation ("," TypeAnnotation)* ">")?
+FunctionType ::= "(" TypeAnnotationList? ")" "=>" TypeAnnotation
+EffectType ::= "<" EffectList ">" TypeAnnotation
+EffectList ::= Identifier ("," Identifier)*
+TypeAnnotationList ::= TypeAnnotation ("," TypeAnnotation)*
+TypeParameters ::= Identifier ("," Identifier)*
+
+/* 基本元素 */
+Identifier ::= Letter (Letter | Digit | "_")*
+Letter ::= "A" | "B" | ... | "Z" | "a" | "b" | ... | "z"
+Digit ::= "0" | "1" | ... | "9"
+StringCharacter ::= <any character except '"' or "\n"> | EscapeSequence
+EscapeSequence ::= "\\" ("n" | "t" | "r" | "\"" | "\\" | "0")
+
+/* 注释 */
+Comment ::= "//" <any character except "\n">* "\n"
+          | "/*" <any character except "*/">* "*/"
