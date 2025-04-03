@@ -6,138 +6,20 @@ use crate::ast::Expr;
 
 use std::fmt;
 
+// 定义子模块
+mod stdio;
+mod math;
+mod text;
+mod array;
+
 pub fn create_stdlib() -> Rc<RefCell<Environment>> {
     let env = Rc::new(RefCell::new(Environment::new()));
     
-    // 添加打印函数
-    add_native_fn(
-        &env,
-        "print",
-        vec!["value"],
-        |args, _| {
-            if let Some(value) = args.get(0) {
-                println!("{}", format_value(value));
-                Ok(Value::Null)
-            } else {
-                println!();
-                Ok(Value::Null)
-            }
-        },
-    );
-    
-    // 添加数学函数
-    add_native_fn(
-        &env,
-        "sqrt",
-        vec!["x"],
-        |args, _| {
-            if let Some(Value::Number(x)) = args.get(0) {
-                Ok(Value::Number(x.sqrt()))
-            } else {
-                Err(RuntimeError::TypeError("sqrt 函数需要一个数字参数".to_string()))
-            }
-        },
-    );
-    
-    add_native_fn(
-        &env,
-        "sin",
-        vec!["x"],
-        |args, _| {
-            if let Some(Value::Number(x)) = args.get(0) {
-                Ok(Value::Number(x.sin()))
-            } else {
-                Err(RuntimeError::TypeError("sin 函数需要一个数字参数".to_string()))
-            }
-        },
-    );
-    
-    add_native_fn(
-        &env,
-        "cos",
-        vec!["x"],
-        |args, _| {
-            if let Some(Value::Number(x)) = args.get(0) {
-                Ok(Value::Number(x.cos()))
-            } else {
-                Err(RuntimeError::TypeError("cos 函数需要一个数字参数".to_string()))
-            }
-        },
-    );
-    
-    // 添加字符串函数
-    add_native_fn(
-        &env,
-        "length",
-        vec!["value"],
-        |args, _| {
-            if let Some(value) = args.get(0) {
-                match value {
-                    Value::String(s) => Ok(Value::Number(s.len() as f64)),
-                    Value::Array(a) => Ok(Value::Number(a.len() as f64)),
-                    _ => Err(RuntimeError::TypeError("length 函数需要一个字符串或数组参数".to_string())),
-                }
-            } else {
-                Err(RuntimeError::ArgumentMismatch { expected: 1, actual: 0 })
-            }
-        },
-    );
-    
-    // 添加数组函数
-    add_native_fn(
-        &env,
-        "push",
-        vec!["array", "value"],
-        |args, _| {
-            if args.len() < 2 {
-                return Err(RuntimeError::ArgumentMismatch { expected: 2, actual: args.len() });
-            }
-            
-            if let Value::Array(mut array) = args[0].clone() {
-                array.push(args[1].clone());
-                Ok(Value::Array(array))
-            } else {
-                Err(RuntimeError::TypeError("push 函数的第一个参数必须是数组".to_string()))
-            }
-        },
-    );
-    
-    // 添加类型转换函数
-    add_native_fn(
-        &env,
-        "to_string",
-        vec!["value"],
-        |args, _| {
-            if let Some(value) = args.get(0) {
-                Ok(Value::String(format_value(value)))
-            } else {
-                Err(RuntimeError::ArgumentMismatch { expected: 1, actual: 0 })
-            }
-        },
-    );
-    
-    add_native_fn(
-        &env,
-        "to_number",
-        vec!["value"],
-        |args, _| {
-            if let Some(value) = args.get(0) {
-                match value {
-                    Value::String(s) => {
-                        match s.parse::<f64>() {
-                            Ok(n) => Ok(Value::Number(n)),
-                            Err(_) => Err(RuntimeError::TypeError(format!("无法将字符串 '{}' 转换为数字", s))),
-                        }
-                    },
-                    Value::Number(n) => Ok(Value::Number(*n)),
-                    Value::Boolean(b) => Ok(Value::Number(if *b { 1.0 } else { 0.0 })),
-                    _ => Err(RuntimeError::TypeError("无法转换为数字".to_string())),
-                }
-            } else {
-                Err(RuntimeError::ArgumentMismatch { expected: 1, actual: 0 })
-            }
-        },
-    );
+    // 注册各个模块的函数
+    stdio::register(&env);
+    math::register(&env);
+    text::register(&env);
+    array::register(&env);
     
     env
 }

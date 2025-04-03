@@ -343,22 +343,23 @@ fn parse_if_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
 }
 
 fn parse_block(parser: &mut Parser) -> Result<Expr, ParseError> {
+    parser.consume(TokenType::LeftBrace, "Expect '{' before block")?;
+    
     let mut statements = Vec::new();
     let mut final_expr = None;
     
-    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-        if parser.check(&TokenType::RightBrace) {
-            break;
-        }
-        
-        // 如果不是语句结尾，可能是最后的表达式
-        if statements.len() > 0 && !parser.check(&TokenType::Let) && 
-           !parser.check(&TokenType::Effect) && !parser.check(&TokenType::Type) {
+    // 如果块为空或只有一个表达式
+    if !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+        // 检查是否是语句（以 let, effect, type 开头）
+        if parser.check(&TokenType::Let) || parser.check(&TokenType::Effect) || parser.check(&TokenType::Type) {
+            // 解析语句序列
+            while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+                statements.push(parser.statement()?);
+            }
+        } else {
+            // 只有一个表达式
             final_expr = Some(Box::new(parse_expression(parser)?));
-            break;
         }
-        
-        statements.push(parser.statement()?);
     }
     
     parser.consume(TokenType::RightBrace, "Expect '}' after block")?;

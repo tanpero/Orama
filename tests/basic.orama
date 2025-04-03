@@ -19,4 +19,4 @@ let sum = add(x, y)
 let product = multiply(x, y)
 
 // 返回最终结果
-[result, sum, product]
+print(result, sum, product)
