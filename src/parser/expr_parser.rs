@@ -73,10 +73,12 @@ fn parse_comparison(parser: &mut Parser) -> Result<Expr, ParseError> {
         TokenType::Greater,
         TokenType::LessEqual,
         TokenType::GreaterEqual,
+        TokenType::LessThan,     // 添加 LessThan 作为 Less 的替代
+        TokenType::GreaterThan,  // 添加 GreaterThan 作为 Greater 的替代
     ]) {
         let operator = match parser.previous().token_type {
-            TokenType::Less => BinaryOp::Less,
-            TokenType::Greater => BinaryOp::Greater,
+            TokenType::Less | TokenType::LessThan => BinaryOp::Less,
+            TokenType::Greater | TokenType::GreaterThan => BinaryOp::Greater,
             TokenType::LessEqual => BinaryOp::LessEqual,
             TokenType::GreaterEqual => BinaryOp::GreaterEqual,
             _ => unreachable!(),
