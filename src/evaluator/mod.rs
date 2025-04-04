@@ -213,10 +213,81 @@ impl Evaluator {
             // 暂时忽略其他表达式类型
             Expr::Perform(_, _, _) => Ok(Value::Null),
             Expr::Handle(_, _, _) => Ok(Value::Null),
-            Expr::Match(_, _) => Ok(Value::Null),
+            Expr::Match(value, cases) => {
+                let value = self.evaluate_expression(value)?;
+                
+                for case in cases {
+                    if let Some(bindings) = self.match_pattern(&case.pattern, &value) {
+                        // 创建新环境
+                        let previous_env = Rc::clone(&self.environment);
+                        self.environment = Rc::new(RefCell::new(Environment::with_enclosing(previous_env)));
+                        
+                        // 绑定匹配的变量
+                        for (name, val) in bindings {
+                            self.environment.borrow_mut().define(name, val);
+                        }
+                        
+                        // 执行匹配分支
+                        let result = self.evaluate_expression(&case.body);
+                        
+                        // 恢复环境
+                        let current_env = self.environment.borrow();
+                        let enclosing = current_env.get_enclosing();
+                        drop(current_env);
+                        self.environment = Rc::clone(&enclosing.as_ref().unwrap());
+                        
+                        return result;
+                    }
+                }
+                
+                Err(RuntimeError::Generic("模式匹配失败".to_string()))
+            },
         }
     }
     
+    // 添加模式匹配辅助方法
+    fn match_pattern(&self, pattern: &crate::ast::Pattern, value: &Value) -> Option<HashMap<String, Value>> {
+        let mut bindings = HashMap::new();
+        
+        // 检查是否是构造器模式
+        if let Value::Object(fields) = value {
+            if let Some(constructor) = fields.get("constructor") {
+                if let Value::String(constructor_name) = constructor {
+                    if constructor_name == &pattern.name {
+                        if let Some(args) = fields.get("args") {
+                            if let Value::Array(arg_values) = args {
+                                // 检查参数数量是否匹配
+                                if let Some(pattern_params) = &pattern.params {
+                                    if pattern_params.len() == arg_values.len() {
+                                        // 递归匹配每个参数
+                                        for (i, param) in pattern_params.iter().enumerate() {
+                                            if let Some(param_bindings) = self.match_pattern(param, &arg_values[i]) {
+                                                bindings.extend(param_bindings);
+                                            } else {
+                                                return None;
+                                            }
+                                        }
+                                        return Some(bindings);
+                                    }
+                                } else if arg_values.is_empty() {
+                                    // 无参数构造器
+                                    return Some(bindings);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 变量模式 - 直接绑定整个值
+        if pattern.params.is_none() {
+            bindings.insert(pattern.name.clone(), value.clone());
+            return Some(bindings);
+        }
+        
+        None
+    }
     fn evaluate_literal(&mut self, lit: &Literal) -> RuntimeResult<Value> {
         match lit {
             Literal::Unit => Ok(Value::Unit),

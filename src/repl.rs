@@ -6,17 +6,17 @@ use crate::stdlib;
 use colored::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use crate::ast::Stmt;
-use crate::ast::Expr;
-use crate::ast::TypeDefinition;
-use crate::ast::Literal;
-use crate::ast::TypeAnnotation;
-use crate::ast::BinaryOp;
-use crate::ast::UnaryOp;
+use crate::ast::*;
 use crate::typechecker::TypeChecker;
-use crate::runtime::Value;
-use std::rc::Rc;
-use std::cell::RefCell;
+use crate::token::TokenType::{
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+};
+use crate::token::Token;
+use crate::token::TokenType;
+
 
 pub fn run_repl() {
     println!("{}", "Orama 语言 REPL".bright_green().bold());
@@ -96,15 +96,33 @@ pub fn run_repl() {
         // 处理续行
         if line.trim_end().ends_with('\\') {
             input_buffer.push_str(&line[..line.len() - 1]);
+            input_buffer.push('\n'); // 保留换行符
             continuation = true;
             continue;
         } else {
             input_buffer.push_str(&line);
+            
+            // 检查括号是否匹配，如果不匹配则自动续行
+            let tokens_result = lexer::lex(&input_buffer);
+            if let Ok(tokens) = tokens_result {
+                if needs_continuation(&tokens) {
+                    input_buffer.push('\n'); // 保留换行符
+                    continuation = true;
+                    continue;
+                }
+            }
+            
             continuation = false;
         }
 
         // 如果不是续行，则处理完整输入
         if continuation {
+            continue;
+        }
+        
+        // 检查输入是否为空或只包含空白字符
+        if input_buffer.trim().is_empty() {
+            input_buffer.clear();
             continue;
         }
         
@@ -116,8 +134,16 @@ pub fn run_repl() {
             continue;
         }
         
-        // 语法分析
+        // 获取词法分析结果
         let tokens = tokens_result.unwrap();
+        
+        // 检查是否只有注释或空白
+        if tokens.is_empty() {
+            input_buffer.clear();
+            continue;
+        }
+        
+        // 语法分析
         let ast_result = parser::parse(tokens);
         if let Err(e) = &ast_result {
             println!("{}: {}", "解析错误".red().bold(), e);
@@ -157,8 +183,6 @@ pub fn run_repl() {
                 },
                 Err(type_error) => {
                     println!("{}: {}", "类型错误".red().bold(), type_error);
-                    // 不要退出程序，只是报告错误并继续
-                    // std::process::exit(1); 删除这行
                 }
             }
         }
@@ -166,6 +190,40 @@ pub fn run_repl() {
         // 清空输入缓冲区，准备下一次输入
         input_buffer.clear();
     }
+}
+
+// 检查是否需要续行（括号不匹配）
+fn needs_continuation(tokens: &[Token]) -> bool {
+    let mut open_parens = 0;
+    let mut open_braces = 0;
+    let mut open_brackets = 0;
+    
+    for token in tokens {
+        match token.token_type {
+            TokenType::LeftParen => open_parens += 1,
+            TokenType::RightParen => {
+                if open_parens > 0 {
+                    open_parens -= 1;
+                }
+            },
+            TokenType::LeftBrace => open_braces += 1,
+            TokenType::RightBrace => {
+                if open_braces > 0 {
+                    open_braces -= 1;
+                }
+            },
+            TokenType::LeftBracket => open_brackets += 1,
+            TokenType::RightBracket => {
+                if open_brackets > 0 {
+                    open_brackets -= 1;
+                }
+            },
+            _ => {}
+        }
+    }
+    
+    // 如果有任何未闭合的括号，则需要续行
+    open_parens > 0 || open_braces > 0 || open_brackets > 0
 }
 
 // 保留原有的 print_ast 函数和其他辅助函数

@@ -205,6 +205,7 @@ fn parse_array_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
     }
 }
 
+// 在 parse_primary 函数中添加对 match 表达式的支持
 fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     if parser.match_token(&[TokenType::False]) {
         return Ok(Expr::Literal(Literal::Boolean(false)));
@@ -221,6 +222,10 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     // 添加对 if 表达式的支持
     if parser.match_token(&[TokenType::If]) {
         return parse_if_expression(parser);
+    }
+
+    if parser.match_token(&[TokenType::Match]) {
+        return parse_match_expression(parser);
     }
 
     if let TokenType::Number(n) = parser.peek().token_type {
@@ -731,4 +736,75 @@ fn parse_index_access(parser: &mut Parser, expr: Expr) -> Result<Expr, ParseErro
         BinaryOp::Index,
         Box::new(index)
     ))
+}
+
+
+fn parse_match_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
+    let value = parse_expression(parser)?;
+    
+    parser.consume(TokenType::LeftBrace, "Expect '{' after match value")?;
+    
+    let mut cases = Vec::new();
+    
+    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+        let pattern = parse_pattern(parser)?;
+        
+        parser.consume(TokenType::Arrow, "Expect '=>' after pattern")?;
+        
+        let body = parse_expression(parser)?;
+        
+        cases.push(crate::ast::MatchCase { pattern, body });
+        
+        // 如果有逗号，消耗它
+        parser.match_token(&[TokenType::Comma]);
+    }
+    
+    parser.consume(TokenType::RightBrace, "Expect '}' after match cases")?;
+    
+    Ok(Expr::Match(Box::new(value), cases))
+}
+
+// 添加解析模式的函数
+fn parse_pattern(parser: &mut Parser) -> Result<crate::ast::Pattern, ParseError> {
+    if let TokenType::Identifier(name) = &parser.peek().token_type {
+        let name = name.clone();
+        parser.advance();
+        
+        // 检查是否有参数列表
+        if parser.match_token(&[TokenType::LeftParen]) {
+            let mut params = Vec::new();
+            
+            // 解析参数
+            if !parser.check(&TokenType::RightParen) {
+                loop {
+                    let param = parse_pattern(parser)?;
+                    params.push(param);
+                    
+                    if !parser.match_token(&[TokenType::Comma]) {
+                        break;
+                    }
+                }
+            }
+            
+            parser.consume(TokenType::RightParen, "Expect ')' after pattern parameters")?;
+            
+            Ok(crate::ast::Pattern {
+                name,
+                params: Some(params),
+            })
+        } else {
+            // 没有参数的简单模式
+            Ok(crate::ast::Pattern {
+                name,
+                params: None,
+            })
+        }
+    } else {
+        Err(ParseError::UnexpectedToken {
+            expected: "pattern".to_string(),
+            found: format!("{:?}", parser.peek().token_type),
+            line: parser.peek().line,
+            column: parser.peek().column,
+        })
+    }
 }
