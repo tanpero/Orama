@@ -37,7 +37,7 @@ impl Evaluator {
     
     fn evaluate_statement(&mut self, stmt: &Stmt) -> RuntimeResult<Value> {
         match stmt {
-            Stmt::VariableDecl(name, expr) => {
+            Stmt::VariableDecl(name, type_annotation, expr) => {
                 let value = self.evaluate_expression(expr)?;
                 self.environment.borrow_mut().define(name.clone(), value);
                 Ok(Value::Null)

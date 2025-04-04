@@ -17,11 +17,18 @@ pub fn parse_variable_declaration(parser: &mut Parser) -> Result<Stmt, ParseErro
     };
     parser.advance();
     
+    // 添加对类型注解的支持
+    let type_annotation = if parser.match_token(&[TokenType::Colon]) {
+        Some(parse_type_annotation(parser)?)
+    } else {
+        None
+    };
+    
     parser.consume(TokenType::Equal, "Expect '=' after variable name")?;
     
     let initializer = parser.expression()?;
     
-    Ok(Stmt::VariableDecl(name, initializer))
+    Ok(Stmt::VariableDecl(name, type_annotation, initializer))
 }
 
 pub fn parse_effect_declaration(parser: &mut Parser) -> Result<Stmt, ParseError> {

@@ -105,7 +105,7 @@ pub struct ReturnHandler {
 #[derive(Debug, Clone)]
 pub enum Stmt {
     // 变量声明
-    VariableDecl(String, Expr),
+    VariableDecl(String, Option<TypeAnnotation>, Expr),
     // 函数声明
     FunctionDecl(String, Vec<Parameter>, Expr),
     // 效应声明

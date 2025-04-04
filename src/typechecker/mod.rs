@@ -855,8 +855,15 @@ impl TypeChecker {
                 self.subst = fn_checker.subst;
                 Ok(())
             }
-            Stmt::VariableDecl(name, initializer) => {
+            Stmt::VariableDecl(name, type_annotation, initializer) => {
                 let var_type = self.infer_expr(initializer)?;
+                
+                // If there's a type annotation, check that it matches the inferred type
+                if let Some(annotation) = type_annotation {
+                    let annotated_type = self.convert_type_annotation(annotation)?;
+                    self.unify(&var_type, &annotated_type)?;
+                }
+                
                 self.env.add_var(name.clone(), var_type);
                 Ok(())
             }

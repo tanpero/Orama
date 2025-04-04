@@ -135,7 +135,6 @@ pub fn run_repl() {
             // 使用保持状态的类型检查器，而不是每次创建新的
             match type_checker.infer_program(&ast.statements) {
                 Ok(_) => {
-                    println!("类型检查通过");
                     
                     // 执行程序
                     let eval_result = evaluator.evaluate(&ast);
@@ -177,7 +176,7 @@ fn print_ast(program: &Program) {
 fn print_stmt(stmt: &Stmt, indent: usize) {
     let indent_str = "  ".repeat(indent);
     match stmt {
-        Stmt::VariableDecl(name, expr) => {
+        Stmt::VariableDecl(name, type_ann, expr) => {
             println!("{}{}({}) = ", indent_str, "变量声明".blue().bold(), name.yellow());
             print_expr(expr, indent + 1);
         }
