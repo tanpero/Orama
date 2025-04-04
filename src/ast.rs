@@ -40,7 +40,7 @@ pub enum Literal {
     Null,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -55,7 +55,8 @@ pub enum BinaryOp {
     GreaterEqual,
     And,
     Or,
-    Access, // 新增：用于属性访问
+    Access,
+    Index, // 新增索引操作符
 }
 
 #[derive(Debug, Clone)]

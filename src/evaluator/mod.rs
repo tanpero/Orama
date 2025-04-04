@@ -161,6 +161,7 @@ impl Evaluator {
                     self.call_function(right_val, vec![left_val])
                 }
             },
+            // 删除这里错误放置的索引操作代码
             // 暂时忽略其他表达式类型
             Expr::Perform(_, _, _) => Ok(Value::Null),
             Expr::Handle(_, _, _) => Ok(Value::Null),
@@ -227,6 +228,23 @@ impl Evaluator {
             // 逻辑运算
             (Value::Boolean(l), BinaryOp::And, Value::Boolean(r)) => Ok(Value::Boolean(*l && *r)),
             (Value::Boolean(l), BinaryOp::Or, Value::Boolean(r)) => Ok(Value::Boolean(*l || *r)),
+            
+            // 添加对象和数组索引操作
+            (Value::Object(obj), BinaryOp::Index, Value::String(key)) => {
+                if let Some(value) = obj.get(key) {
+                    Ok(value.clone())
+                } else {
+                    Err(RuntimeError::Generic(format!("对象中不存在键 '{}'", key)))
+                }
+            },
+            (Value::Array(arr), BinaryOp::Index, Value::Number(idx)) => {
+                let index = *idx as usize;
+                if index < arr.len() {
+                    Ok(arr[index].clone())
+                } else {
+                    Err(RuntimeError::Generic(format!("索引越界: {} (数组长度: {})", index, arr.len())))
+                }
+            },
             
             // 类型错误
             _ => Err(RuntimeError::TypeError(format!(

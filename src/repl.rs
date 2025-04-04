@@ -458,6 +458,7 @@ fn print_function_type(func_type: &crate::ast::FunctionType, indent: usize) {
 }
 
 // 格式化二元操作符
+// 在 format_binary_op 函数中添加对 Index 操作符的处理
 fn format_binary_op(op: &BinaryOp) -> colored::ColoredString {
     match op {
         BinaryOp::Add => "+".bright_cyan(),
@@ -473,7 +474,8 @@ fn format_binary_op(op: &BinaryOp) -> colored::ColoredString {
         BinaryOp::GreaterEqual => ">=".bright_cyan(),
         BinaryOp::And => "and".bright_cyan(),
         BinaryOp::Or => "or".bright_cyan(),
-        BinaryOp::Access => ".".bright_cyan(), // 添加对 Access 操作符的处理
+        BinaryOp::Access => ".".bright_cyan(),
+        BinaryOp::Index => "[]".bright_cyan(), // 添加索引操作符
     }
 }
 

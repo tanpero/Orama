@@ -141,27 +141,18 @@ fn parse_unary(parser: &mut Parser) -> Result<Expr, ParseError> {
 
 fn parse_call(parser: &mut Parser) -> Result<Expr, ParseError> {
     let mut expr = parse_primary(parser)?;
-
+    
     loop {
         if parser.match_token(&[TokenType::LeftParen]) {
             expr = finish_call(parser, expr)?;
-        } else if parser.match_token(&[TokenType::Dot]) {
-            let name = parser.consume(TokenType::Identifier("".to_string()), "Expect property name after '.'")?;
-            if let TokenType::Identifier(name) = &name.token_type {
-                // 修改这里，实现属性访问而不是简单的变量引用
-                expr = Expr::Binary(
-                    Box::new(expr),
-                    BinaryOp::Access,  // 使用 Dot 操作符来表示属性访问
-                    Box::new(Expr::Variable(name.clone()))
-                );
-            } else {
-                unreachable!();
-            }
+        } else if parser.match_token(&[TokenType::LeftBracket]) {
+            // 处理索引访问
+            expr = parse_index_access(parser, expr)?;
         } else {
             break;
         }
     }
-
+    
     Ok(expr)
 }
 
@@ -223,6 +214,9 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     }
     if parser.match_token(&[TokenType::Null]) {
         return Ok(Expr::Literal(Literal::Null));
+    }
+    if parser.match_token(&[TokenType::LeftBrace]) {
+        return parse_object_literal(parser);
     }
     // 添加对 if 表达式的支持
     if parser.match_token(&[TokenType::If]) {
@@ -680,3 +674,61 @@ fn parse_match(parser: &mut Parser) -> Result<Expr, ParseError> {
     Ok(Expr::Match(Box::new(expr), cases))
 }
 
+// 添加解析对象字面量的函数
+fn parse_object_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
+    let mut fields = Vec::new();
+    
+    if !parser.check(&TokenType::RightBrace) {
+        loop {
+            // 解析键（支持字符串字面量和标识符）
+            let key = if let TokenType::String(s) = &parser.peek().token_type {
+                let s = s.clone();
+                parser.advance();
+                s
+            } else if let TokenType::Identifier(name) = &parser.peek().token_type {
+                let name = name.clone();
+                parser.advance();
+                name
+            } else {
+                return Err(ParseError::UnexpectedToken {
+                    expected: "string or identifier".to_string(),
+                    found: format!("{:?}", parser.peek().token_type),
+                    line: parser.peek().line,
+                    column: parser.peek().column,
+                });
+            };
+            
+            // 解析冒号
+            parser.consume(TokenType::Colon, "Expect ':' after object key")?;
+            
+            // 解析值
+            let value = parse_expression(parser)?;
+            
+            fields.push((key, value));
+            
+            if !parser.match_token(&[TokenType::Comma]) {
+                break;
+            }
+        }
+    }
+    
+    parser.consume(TokenType::RightBrace, "Expect '}' after object literal")?;
+    
+    Ok(Expr::Literal(Literal::Object(fields)))
+}
+
+// 添加解析索引访问的函数（在 parse_call 函数中调用）
+fn parse_index_access(parser: &mut Parser, expr: Expr) -> Result<Expr, ParseError> {
+    // 解析索引表达式
+    let index = parse_expression(parser)?;
+    
+    // 消费右方括号
+    parser.consume(TokenType::RightBracket, "Expect ']' after index")?;
+    
+    // 创建索引访问表达式（使用二元操作符实现）
+    Ok(Expr::Binary(
+        Box::new(expr),
+        BinaryOp::Index,
+        Box::new(index)
+    ))
+}
