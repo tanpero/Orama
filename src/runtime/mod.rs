@@ -40,7 +40,7 @@ pub struct Effect {
 // 环境类型，用于存储变量
 #[derive(Debug)]
 pub struct Environment {
-    values: HashMap<String, Value>,
+    pub values: HashMap<String, Value>,
     enclosing: Option<Rc<RefCell<Environment>>>,
 }
 

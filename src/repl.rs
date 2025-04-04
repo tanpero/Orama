@@ -14,6 +14,9 @@ use crate::ast::TypeAnnotation;
 use crate::ast::BinaryOp;
 use crate::ast::UnaryOp;
 use crate::typechecker::TypeChecker;
+use crate::runtime::Value;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub fn run_repl() {
     println!("{}", "Orama 语言 REPL".bright_green().bold());
@@ -29,12 +32,15 @@ pub fn run_repl() {
     
     // 创建标准库环境
     let stdlib_env = stdlib::create_stdlib();
-    let mut evaluator = Evaluator::with_environment(stdlib_env);
+    let mut evaluator = Evaluator::with_environment(stdlib_env.clone());
 
     // 创建并初始化类型检查器，保持其状态
     let mut type_checker = TypeChecker::new();
     type_checker.init_builtins();
-
+    
+    // 将标准库函数添加到类型检查器中
+    type_checker.init_stdlib(&stdlib_env);
+    
     loop {
         let prompt = if continuation { 
             "... ".to_string() 

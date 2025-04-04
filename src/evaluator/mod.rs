@@ -4,6 +4,7 @@ use crate::ast::{Program, Stmt, Expr, Literal, BinaryOp, UnaryOp};
 use crate::runtime::{Environment, Value, Function, RuntimeError, RuntimeResult};
 use crate::runtime::Effect;
 use std::collections::HashMap;
+use crate::ast::TypeDefinition;
 
 pub struct Evaluator {
     environment: Rc<RefCell<Environment>>,
@@ -45,8 +46,8 @@ impl Evaluator {
             Stmt::FunctionDecl(name, params, body) => {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
                 let function = Function {
-                    param_types: Vec::new(), // 初始化参数类型为空向量
-                    return_type: None,       // 初始化返回类型为 None
+                    param_types: Vec::new(), // 添加缺失的字段
+                    return_type: None,       // 添加缺失的字段
                     params: param_names,
                     body: Rc::new(body.clone()),
                     closure: Rc::clone(&self.environment),
@@ -56,9 +57,56 @@ impl Evaluator {
                 Ok(Value::Null)
             },
             Stmt::Expression(expr) => self.evaluate_expression(expr),
-            // 暂时忽略效应和类型声明
+            // 处理类型声明，为每个变体创建构造函数
+            Stmt::TypeDecl(name, _, type_def) => {
+                // 根据TypeDefinition的类型处理
+                match type_def {
+                    TypeDefinition::Union(variants) => {
+                        // 为联合类型的每个变体创建构造函数
+                        for variant in variants {
+                            let variant_name = &variant.name;
+                            let param_count = if let Some(params) = &variant.params {
+                                params.len()
+                            } else {
+                                0
+                            };
+                            
+                            // 创建参数名称列表
+                            let param_names: Vec<String> = (0..param_count)
+                                .map(|i| format!("p{}", i))
+                                .collect();
+                            
+                            // 创建构造函数体 - 返回一个表示该变体的对象
+                            let body = Expr::Literal(Literal::Object(vec![
+                                ("constructor".to_string(), Expr::Literal(Literal::String(variant_name.clone()))),
+                                ("type".to_string(), Expr::Literal(Literal::String(name.clone()))),
+                                ("args".to_string(), Expr::Literal(Literal::Array(
+                                    param_names.iter().map(|p| Expr::Variable(p.clone())).collect()
+                                ))),
+                            ]));
+                            
+                            // 创建构造函数
+                            let function = Function {
+                                param_types: Vec::new(), // 添加缺失的字段
+                                return_type: None,       // 添加缺失的字段
+                                params: param_names,
+                                body: Rc::new(body),
+                                closure: Rc::clone(&self.environment),
+                            };
+                            
+                            // 将构造函数添加到环境中
+                            self.environment.borrow_mut().define(variant_name.clone(), Value::Function(function));
+                        }
+                    }
+                    TypeDefinition::Record(_) => {
+                        // 记录类型暂时不需要特殊处理
+                        // 如果需要为记录类型创建构造函数，可以在这里添加代码
+                    }
+                }
+                
+                Ok(Value::Null)
+            },
             Stmt::EffectDecl(_, _, _) => Ok(Value::Null),
-            Stmt::TypeDecl(_, _, _) => Ok(Value::Null),
         }
     }
     
