@@ -1,0 +1,54 @@
+// 猜数字游戏
+// 游戏会随机生成一个1-100之间的数字，玩家需要猜出这个数字
+// 每次猜测后，游戏会提示数字是太大还是太小
+
+let main = () => {
+  // 打印欢迎信息
+  println("欢迎来到猜数字游戏！")
+  println("我已经想好了一个1到100之间的数字，请你猜一猜。")
+  
+  // 生成1-100之间的随机数
+  let target = floor(random() * 100) + 1
+  
+  // 记录猜测次数
+  let attempts = 0
+  
+  // 游戏主循环
+  let gameLoop = () => {
+    // 获取玩家输入
+    let guess = to_number(input("请输入你的猜测 (1-100):"))
+    
+    // 增加猜测次数
+    attempts = attempts + 1
+    
+    // 检查猜测结果
+    if (guess == target) {
+      println("恭喜你猜对了！目标数字就是 " + to_string(target))
+      println("你总共猜了 " + to_string(attempts) + " 次。")
+      
+      // 询问是否再玩一次
+      let playAgain = input("想再玩一次吗？(y/n):")
+      if (playAgain == "y" || playAgain == "Y") {
+        // 重置游戏
+        target = floor(random() * 100) + 1
+        attempts = 0
+        println("好的！我又想好了一个新数字。")
+        gameLoop()
+      } else {
+        println("谢谢参与，下次再见！")
+      }
+    } else if (guess < target) {
+      println("太小了！再试一次。")
+      gameLoop()
+    } else {
+      println("太大了！再试一次。")
+      gameLoop()
+    }
+  }
+  
+  // 开始游戏
+  gameLoop()
+}
+
+// 运行游戏
+main()

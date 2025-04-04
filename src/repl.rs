@@ -13,6 +13,7 @@ use crate::ast::Literal;
 use crate::ast::TypeAnnotation;
 use crate::ast::BinaryOp;
 use crate::ast::UnaryOp;
+use crate::typechecker::TypeChecker;
 
 pub fn run_repl() {
     println!("{}", "Orama 语言 REPL".bright_green().bold());
@@ -30,6 +31,10 @@ pub fn run_repl() {
     let stdlib_env = stdlib::create_stdlib();
     let mut evaluator = Evaluator::with_environment(stdlib_env);
 
+    // 创建并初始化类型检查器，保持其状态
+    let mut type_checker = TypeChecker::new();
+    type_checker.init_builtins();
+
     loop {
         let prompt = if continuation { 
             "... ".to_string() 
@@ -38,90 +43,123 @@ pub fn run_repl() {
         };
         
         // 使用 rustyline 的 colored prompt 支持
-        match rl.readline_with_initial(&prompt, ("", "")) {
-            Ok(line) => {
-                // 添加历史记录，处理可能的错误
-                if let Err(e) = rl.add_history_entry(line.as_str()) {
-                    println!("{}: 无法添加历史记录: {:?}", "警告".yellow().bold(), e);
-                }
-
-                if line.trim() == ".exit" {
+        let readline_result = rl.readline_with_initial(&prompt, ("", ""));
+        
+        // 处理读取输入的结果
+        if let Err(e) = &readline_result {
+            match e {
+                ReadlineError::Interrupted => {
+                    println!("CTRL-C");
                     break;
-                } else if line.trim() == ".ast" {
-                    show_ast = !show_ast;
-                    println!("AST 显示模式: {}", if show_ast { "开启".green() } else { "关闭".red() });
-                    continue;
-                } else if line.trim() == ".eval" {
-                    show_ast = false;
-                    println!("求值模式: {}", "开启".green());
-                    continue;
                 }
-
-                // 检查行尾是否有续行符 '\'
-                if line.trim_end().ends_with('\\') {
-                    input_buffer.push_str(&line[..line.len() - 1]);
-                    continuation = true;
-                    continue;
-                } else {
-                    input_buffer.push_str(&line);
-                    continuation = false;
+                ReadlineError::Eof => {
+                    println!("CTRL-D");
+                    break;
                 }
-
-                // 如果有完整的输入，则进行词法分析和语法分析
-                if !continuation {
-                    match lexer::lex(&input_buffer) {
-                        Ok(tokens) => {
-                            // 在 match parser::parse(tokens) 的错误处理部分
-                            match parser::parse(tokens) {
-                                Ok(ast) => {
-                                    if show_ast {
-                                        println!("{}", "AST:".yellow().bold());
-                                        print_ast(&ast);
-                                    } else {
-                                        // 执行代码
-                                        match evaluator.evaluate(&ast) {
-                                            Ok(value) => {
-                                                if !matches!(value, crate::runtime::Value::Null) {
-                                                    println!("{} {}", "=>".bright_blue().bold(), format!("{}", stdlib::format_value(&value)).bright_white());
-                                                }
-                                            },
-                                            Err(e) => {
-                                                println!("{}: {}", "运行时错误".red().bold(), e);
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    println!("{}: {}", "解析错误".red().bold(), e);
-                                    if let parser::ParseError::InvalidSyntax(msg, _, _) = &e {
-                                        if msg.contains("数组类型检查错误") {
-                                            println!("{}: 数组中的所有元素必须是同一类型", "提示".yellow().bold());
-                                        }
-                                    }
-                                    input_buffer.clear();
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            println!("{}: {}", "词法错误".red().bold(), e);
-                        }
-                    }
-                    input_buffer.clear();
+                err => {
+                    println!("{}: {:?}", "错误".red().bold(), err);
+                    break;
                 }
-            }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
-            Err(err) => {
-                println!("{}: {:?}", "错误".red().bold(), err);
-                break;
             }
         }
+        
+        // 如果读取成功，处理输入
+        let line = match readline_result {
+            Ok(line) => line,
+            Err(_) => continue, // 已经处理过错误，这里直接跳过
+        };
+        
+        // 添加历史记录，处理可能的错误
+        if let Err(e) = rl.add_history_entry(line.as_str()) {
+            println!("{}: 无法添加历史记录: {:?}", "警告".yellow().bold(), e);
+        }
+
+        // 处理特殊命令
+        if line.trim() == ".exit" {
+            break;
+        } else if line.trim() == ".ast" {
+            show_ast = !show_ast;
+            println!("AST 显示模式: {}", if show_ast { "开启".green() } else { "关闭".red() });
+            continue;
+        } else if line.trim() == ".eval" {
+            show_ast = false;
+            println!("求值模式: {}", "开启".green());
+            continue;
+        }
+
+        // 处理续行
+        if line.trim_end().ends_with('\\') {
+            input_buffer.push_str(&line[..line.len() - 1]);
+            continuation = true;
+            continue;
+        } else {
+            input_buffer.push_str(&line);
+            continuation = false;
+        }
+
+        // 如果不是续行，则处理完整输入
+        if continuation {
+            continue;
+        }
+        
+        // 词法分析
+        let tokens_result = lexer::lex(&input_buffer);
+        if let Err(e) = &tokens_result {
+            println!("{}: {}", "词法错误".red().bold(), e);
+            input_buffer.clear();
+            continue;
+        }
+        
+        // 语法分析
+        let tokens = tokens_result.unwrap();
+        let ast_result = parser::parse(tokens);
+        if let Err(e) = &ast_result {
+            println!("{}: {}", "解析错误".red().bold(), e);
+            if let parser::ParseError::InvalidSyntax(msg, _, _) = e {
+                if msg.contains("数组类型检查错误") {
+                    println!("{}: 数组中的所有元素必须是同一类型", "提示".yellow().bold());
+                }
+            }
+            input_buffer.clear();
+            continue;
+        }
+        
+        // 获取 AST
+        let ast = ast_result.unwrap();
+        
+        // 根据模式显示 AST 或执行代码
+        if show_ast {
+            println!("{}", "AST:".yellow().bold());
+            print_ast(&ast);
+        } else {
+            // 使用保持状态的类型检查器，而不是每次创建新的
+            match type_checker.infer_program(&ast.statements) {
+                Ok(_) => {
+                    println!("类型检查通过");
+                    
+                    // 执行程序
+                    let eval_result = evaluator.evaluate(&ast);
+                    match eval_result {
+                        Ok(value) => {
+                            if !matches!(value, crate::runtime::Value::Null) {
+                                println!("{} {}", "=>".bright_blue().bold(), format!("{}", stdlib::format_value(&value)).bright_white());
+                            }
+                        },
+                        Err(e) => {
+                            println!("{}: {}", "运行时错误".red().bold(), e);
+                        }
+                    }
+                },
+                Err(type_error) => {
+                    println!("{}: {}", "类型错误".red().bold(), type_error);
+                    // 不要退出程序，只是报告错误并继续
+                    // std::process::exit(1); 删除这行
+                }
+            }
+        }
+        
+        // 清空输入缓冲区，准备下一次输入
+        input_buffer.clear();
     }
 }
 
@@ -238,7 +276,6 @@ fn print_expr(expr: &Expr, indent: usize) {
                     println!("{}}}", indent_str);
                 }
                 Literal::Null => println!("{}{}", indent_str, "null".magenta()),
-                Literal::Unit => println!("{}{}", indent_str, "unit".magenta()),
             }
         }
         Expr::Variable(name) => {
@@ -370,7 +407,6 @@ fn print_expr(expr: &Expr, indent: usize) {
 
 // 格式化输出 TypeAnnotation
 fn print_type_annotation(type_ann: &TypeAnnotation, indent: usize) {
-    let indent_str = "  ".repeat(indent);
     match type_ann {
         TypeAnnotation::Array(elem_type) => {
             print!("[]");
@@ -405,26 +441,7 @@ fn print_type_annotation(type_ann: &TypeAnnotation, indent: usize) {
             print!("> ");
             print_type_annotation(return_type, indent);
         }
-        TypeAnnotation::Array(elem_type) => {
-            print!("[]");
-            print_type_annotation(elem_type, indent);
-        }
-        TypeAnnotation::Simple(name, args) => {
-            print!("{}", name.green());
-            if let Some(args) = args {
-                if !args.is_empty() {
-                print!("<");
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        print!(", ");
-                    }
-                    print_type_annotation(arg, indent);
-                }
-                print!(">");
-            }
-        }
     }
-}
 }
 
 // 格式化输出 FunctionType

@@ -125,6 +125,17 @@ impl TypeEnv {
         }
     }
 
+    // 添加递归类型定义
+    pub fn add_recursive_type(&mut self, name: String, type_params: Vec<String>, type_def: Type) {
+        // 先添加一个占位符类型
+        let placeholder = Type::Generic(name.clone(), 
+            type_params.iter().map(|p| Type::Var(TypeVarId(0))).collect());
+        self.types.insert(name.clone(), placeholder);
+        
+        // 然后添加实际类型定义
+        self.types.insert(name, type_def);
+    }
+
     // 创建新的类型变量
     pub fn new_type_var(&mut self) -> Type {
         let id = TypeVarId(self.next_var_id);
@@ -366,6 +377,21 @@ impl TypeChecker {
                 Ok(())
             }
 
+            (Type::Generic(name1, args1), Type::Generic(name2, args2)) => {
+                if name1 != name2 || args1.len() != args2.len() {
+                    return Err(TypeError::UnificationFailure(
+                        format!("{}", t1),
+                        format!("{}", t2),
+                    ));
+                }
+                
+                for (a1, a2) in args1.iter().zip(args2.iter()) {
+                    self.unify(a1, a2)?;
+                }
+                
+                Ok(())
+            }
+
             // Any 类型可以与任何类型匹配
             (Type::Any, _) | (_, Type::Any) => Ok(()),
 
@@ -415,6 +441,37 @@ impl TypeChecker {
         }
     }
 
+    // 检查函数调用与函数签名是否匹配
+    fn check_function_call(&mut self, fn_type: &Type, args: &[Expr]) -> TypeResult<Type> {
+        match fn_type {
+            Type::Function(param_types, return_type) => {
+                if args.len() != param_types.len() {
+                    return Err(TypeError::TypeMismatch {
+                        expected: format!("函数参数数量: {}", param_types.len()),
+                        actual: format!("提供的参数数量: {}", args.len()),
+                    });
+                }
+                
+                // 检查每个参数类型
+                for (i, (arg, expected_type)) in args.iter().zip(param_types.iter()).enumerate() {
+                    let arg_type = self.infer_expr(arg)?;
+                    if let Err(e) = self.unify(&arg_type, expected_type) {
+                        return Err(TypeError::TypeMismatch {
+                            expected: format!("参数 #{}: {}", i + 1, expected_type),
+                            actual: format!("参数 #{}: {}", i + 1, arg_type),
+                        });
+                    }
+                }
+                
+                Ok(self.subst.apply(return_type))
+            },
+            _ => Err(TypeError::TypeMismatch {
+                expected: "函数类型".to_string(),
+                actual: format!("{}", fn_type),
+            }),
+        }
+    }
+
     // 推导表达式类型
     pub fn infer_expr(&mut self, expr: &Expr) -> TypeResult<Type> {
         match expr {
@@ -458,18 +515,38 @@ impl TypeChecker {
                             })
                         }
                     }
+                    // 加法运算符 - 特殊处理，支持数字加法和字符串连接
+                    BinaryOp::Add => {
+                        // 尝试作为数字处理
+                        if let (Type::Number, Type::Number) = (&left_type, &right_type) {
+                            return Ok(Type::Number);
+                        }
+                        
+                        // 尝试作为字符串处理
+                        if let (Type::String, Type::String) = (&left_type, &right_type) {
+                            return Ok(Type::String);
+                        }
+                        
+                        // 如果左右类型相同，统一它们
+                        self.unify(&left_type, &right_type)?;
+                        
+                        // 根据统一后的类型决定结果类型
+                        let unified_type = self.subst.apply(&left_type);
+                        match unified_type {
+                            Type::Number => Ok(Type::Number),
+                            Type::String => Ok(Type::String),
+                            _ => Err(TypeError::TypeMismatch {
+                                expected: "Number 或 String".to_string(),
+                                actual: format!("{}", unified_type),
+                            })
+                        }
+                    }
                     // 算术运算符
-                    BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply | 
+                    BinaryOp::Subtract | BinaryOp::Multiply | 
                     BinaryOp::Divide | BinaryOp::Modulo => {
                         self.unify(&left_type, &Type::Number)?;
                         self.unify(&right_type, &Type::Number)?;
                         Ok(Type::Number)
-                    }
-                    // 字符串连接
-                    BinaryOp::Add => {
-                        self.unify(&left_type, &Type::String)?;
-                        self.unify(&right_type, &Type::String)?;
-                        Ok(Type::String)
                     }
                     // 比较运算符
                     BinaryOp::Equal | BinaryOp::NotEqual | 
@@ -503,7 +580,8 @@ impl TypeChecker {
             }
             Expr::Call(callee, args) => {
                 let callee_type = self.infer_expr(callee)?;
-                
+                self.check_function_call(&callee_type, args);
+
                 // 为每个参数创建类型变量
                 let mut param_types = Vec::new();
                 for arg in args {
@@ -783,6 +861,39 @@ impl TypeChecker {
             Ok(Type::Null)
         }
     }
+
+    // 实例化泛型类型
+    pub fn instantiate_generic(&mut self, generic_type: &Type) -> Type {
+        match generic_type {
+            Type::Generic(name, type_args) => {
+                // 为每个类型参数创建新的类型变量
+                let mut subst = TypeSubst::new();
+                let mut new_args = Vec::new();
+                
+                for arg in type_args {
+                    if let Type::Var(id) = arg {
+                        let new_var = self.env.new_type_var();
+                        subst.add(*id, new_var.clone());
+                        new_args.push(new_var);
+                    } else {
+                        new_args.push(self.instantiate_generic(arg));
+                    }
+                }
+                
+                Type::Generic(name.clone(), new_args)
+            },
+            Type::Function(params, ret) => {
+                let new_params = params.iter()
+                    .map(|p| self.instantiate_generic(p))
+                    .collect();
+                let new_ret = Box::new(self.instantiate_generic(ret));
+                Type::Function(new_params, new_ret)
+            },
+            // 处理其他类型...
+            _ => generic_type.clone(),
+        }
+    }
+
 }
 
 
