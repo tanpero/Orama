@@ -1,6 +1,6 @@
 effect State<T> {
-  get () => T,
-  set (value: T) => ()
+  get: () => T,
+  set: (value: T) => ()
 }
 
 let increment = () => {

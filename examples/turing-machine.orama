@@ -1,0 +1,138 @@
+// 图灵机模拟器
+// 使用列表作为磁带，递归函数作为状态转换
+
+let createTape = (input: String) => {
+  // 使用递归代替循环，不使用return
+  let createTapeHelper = (input: String, index: Number, result: List) => {
+    if index >= length(input) {
+      result // 最后一个表达式的值会作为函数结果
+    } else {
+      let newResult = concat(result, [substring(input, index, index + 1)])
+      createTapeHelper(input, index + 1, newResult)
+    }
+  }
+  
+  createTapeHelper(input, 0, ["_"])
+}
+
+let printTape = (tape: List, position: Number) => {
+  // 使用递归代替循环和变量修改
+  let printTapeHelper = (tape: List, position: Number, index: Number, result: String) => {
+    if index >= length(tape) {
+      println(result)
+    } else {
+      let newResult = ""
+      if index == position {
+        newResult = result + "[" + tape[index] + "]"
+      } else {
+        newResult = result + " " + tape[index] + " "
+      }
+      
+      printTapeHelper(tape, position, index + 1, newResult)
+    }
+  }
+  
+  printTapeHelper(tape, position, 0, "")
+}
+
+// 更新磁带上特定位置的值，返回新的磁带
+let updateTape = (tape: List, position: Number, newValue: String) => {
+  // 使用递归代替循环和变量修改
+  let updateTapeHelper = (tape: List, position: Number, index: Number, result: List) => {
+    if index >= length(tape) {
+      result // 最后一个表达式的值会作为函数结果
+    } else {
+      let newResult = []
+      if index == position {
+        newResult = append(result, newValue)
+      } else {
+        newResult = append(result, tape[index])
+      }
+      
+      updateTapeHelper(tape, position, index + 1, newResult)
+    }
+  }
+  
+  updateTapeHelper(tape, position, 0, [])
+}
+
+// 扩展磁带，在末尾添加一个值
+let extendTape = (tape: List, value: String) => {
+  append(tape, value) // 最后一个表达式的值会作为函数结果
+}
+
+// 图灵机状态转换函数
+// state: 当前状态
+// tape: 磁带内容
+// position: 磁带头位置
+let turingMachine = (state: String, tape: List, position: Number) => {
+  // 打印当前状态
+  println("状态: " + state)
+  printTape(tape, position)
+  
+  // 获取当前符号
+  let currentSymbol = ""
+  if position >= 0 && position < length(tape) {
+    currentSymbol = tape[position]
+  } else {
+    currentSymbol = "_" // 空白符号
+  }
+  
+  // 状态转换规则
+  if state == "start" {
+    if currentSymbol == "0" {
+      // 将0改为1，向右移动，保持状态
+      let newTape = updateTape(tape, position, "1")
+      turingMachine(state, newTape, position + 1)
+    } else if currentSymbol == "1" {
+      // 将1改为0，向右移动，改变状态
+      let newTape = updateTape(tape, position, "0")
+      turingMachine("middle", newTape, position + 1)
+    } else if currentSymbol == "_" {
+      // 遇到空白，向左移动，改变状态
+      turingMachine("reverse", tape, position - 1)
+    }
+  } else if state == "middle" {
+    if currentSymbol == "0" || currentSymbol == "1" {
+      // 保持符号不变，向右移动
+      turingMachine(state, tape, position + 1)
+    } else if currentSymbol == "_" {
+      // 写入1，向左移动
+      let newTape = tape
+      if position >= length(tape) {
+        newTape = extendTape(tape, "1")
+      } else {
+        newTape = updateTape(tape, position, "1")
+      }
+      turingMachine("reverse", newTape, position - 1)
+    }
+  } else if state == "reverse" {
+    if currentSymbol == "0" || currentSymbol == "1" {
+      // 向左移动
+      turingMachine(state, tape, position - 1)
+    } else if currentSymbol == "_" || position < 0 {
+      // 到达左边界，结束
+      println("图灵机执行完毕!")
+      printTape(tape, -1)
+    }
+  } else {
+    println("未知状态，停止执行")
+  }
+}
+
+let main = () => {
+  println("图灵机模拟器")
+  println("这个程序将模拟一个简单的图灵机，展示图灵完备性")
+  
+  let input = input("请输入一个二进制字符串（只包含0和1）：")
+  let tape = createTape(input)
+  
+  println("初始磁带:")
+  printTape(tape, 0)
+  println("开始执行图灵机...")
+  
+  // 从初始状态开始，磁带头位于位置0
+  turingMachine("start", tape, 0)
+}
+
+main()

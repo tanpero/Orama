@@ -42,6 +42,10 @@ impl TypeChecker {
         self.env.add_type("Boolean".to_string(), Type::Boolean);
         self.env.add_type("Any".to_string(), Type::Any);
         self.env.add_type("Null".to_string(), Type::Null);
+    
+        // 注册 List 类型
+        let list_type_var = self.env.new_type_var();
+        self.env.add_type("List".to_string(), Type::Generic("List".to_string(), vec![list_type_var]));
     }
 
     // 从 AST 类型注解转换为内部类型表示
