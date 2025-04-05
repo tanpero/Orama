@@ -44,12 +44,12 @@ impl<'a> ExprTypeChecker<'a> {
     fn infer_binary_expr(&mut self, left: &Expr, op: &BinaryOp, right: &Expr) -> TypeResult<Type> {
         let left_type = self.infer_expr(left)?;
         let right_type = self.infer_expr(right)?;
-
+    
         match op {
             BinaryOp::Index => {
                 // 检查右侧是否为字符串（对象键）
                 self.checker.unify(&right_type, &Type::String)?;
-
+    
                 // 对于对象类型，我们需要检查是否为记录类型
                 if let Type::Record(fields) = &left_type {
                     // 如果是字符串字面量，我们可以直接检查字段
@@ -58,7 +58,7 @@ impl<'a> ExprTypeChecker<'a> {
                             return Ok(field_type.clone());
                         }
                     }
-
+    
                     // 如果不是字面量或字段不存在，返回 Any 类型
                     // 这允许动态访问，但在运行时可能会失败
                     Ok(Type::Any)
@@ -69,7 +69,7 @@ impl<'a> ExprTypeChecker<'a> {
                         self.checker.unify(&right_type, &Type::Number)?;
                         return Ok(*elem_type.clone());
                     }
-
+    
                     // 如果既不是记录也不是数组，报错
                     Err(TypeError::TypeMismatch {
                         expected: "对象或数组".to_string(),
@@ -110,15 +110,15 @@ impl<'a> ExprTypeChecker<'a> {
                 if let (Type::Number, Type::Number) = (&left_type, &right_type) {
                     return Ok(Type::Number);
                 }
-
+    
                 // 尝试作为字符串处理
                 if let (Type::String, Type::String) = (&left_type, &right_type) {
                     return Ok(Type::String);
                 }
-
+    
                 // 如果左右类型相同，统一它们
                 self.checker.unify(&left_type, &right_type)?;
-
+    
                 // 根据统一后的类型决定结果类型
                 let unified_type = self.checker.subst.apply(&left_type);
                 match unified_type {

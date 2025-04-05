@@ -37,6 +37,8 @@ pub enum TokenType {
     And,
     Or,
     Not,
+    LogicalAnd,
+    LogicalOr,
 
     // 分隔符
     LeftParen,
@@ -92,6 +94,8 @@ impl fmt::Display for TokenType {
             TokenType::And => write!(f, "And"),
             TokenType::Or => write!(f, "Or"),
             TokenType::Not => write!(f, "Not"),
+            TokenType::LogicalAnd => write!(f, "LogicalAnd"),
+            TokenType::LogicalOr => write!(f, "LogicalOr"),
             TokenType::LeftParen => write!(f, "LeftParen"),
             TokenType::RightParen => write!(f, "RightParen"),
             TokenType::LeftBrace => write!(f, "LeftBrace"),

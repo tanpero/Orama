@@ -181,13 +181,3 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
     }
 }
 
-pub fn parse_block_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
-    parser.consume(
-        TokenType::LeftBrace,
-        "Expect '{' at the beginning of a block",
-    )?;
-
-    let (statements, expr) = parse_block_contents(parser)?;
-
-    Ok(Expr::Block(statements, expr))
-}

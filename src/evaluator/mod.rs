@@ -334,12 +334,7 @@ impl Evaluator {
         }
     }
 
-    fn evaluate_binary_op(
-        &self,
-        left: &Value,
-        op: &BinaryOp,
-        right: &Value,
-    ) -> RuntimeResult<Value> {
+    fn evaluate_binary_op(&self, left: &Value, op: &BinaryOp, right: &Value) -> RuntimeResult<Value> {
         match (left, op, right) {
             // 数值运算
             (Value::Number(l), BinaryOp::Add, Value::Number(r)) => Ok(Value::Number(l + r)),

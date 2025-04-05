@@ -172,6 +172,6 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
 pub use expr_parser::{parse_expression, parse_block_contents};
 pub use type_parser::parse_type_annotation;
 pub use literal_parser::{parse_array_literal, parse_object_literal, parse_index_access};
-pub use function_parser::{parse_empty_param_function, parse_parenthesized_expr_or_function, parse_block_expression};
+pub use function_parser::{parse_empty_param_function, parse_parenthesized_expr_or_function};
 pub use control_flow_parser::{parse_if_expression, parse_match_expression, parse_pattern};
 pub use effect_parser::{parse_perform, parse_handle};

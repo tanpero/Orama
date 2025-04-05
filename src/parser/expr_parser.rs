@@ -39,7 +39,7 @@ fn parse_assignment(parser: &mut Parser) -> Result<Expr, ParseError> {
 fn parse_or(parser: &mut Parser) -> Result<Expr, ParseError> {
     let mut expr = parse_and(parser)?;
 
-    while parser.match_token(&[TokenType::Or]) {
+    while parser.match_token(&[TokenType::Or, TokenType::LogicalOr]) {
         let right = parse_and(parser)?;
         expr = Expr::Binary(Box::new(expr), BinaryOp::Or, Box::new(right));
     }
@@ -50,7 +50,7 @@ fn parse_or(parser: &mut Parser) -> Result<Expr, ParseError> {
 fn parse_and(parser: &mut Parser) -> Result<Expr, ParseError> {
     let mut expr = parse_equality(parser)?;
 
-    while parser.match_token(&[TokenType::And]) {
+    while parser.match_token(&[TokenType::And, TokenType::LogicalAnd]) {
         let right = parse_equality(parser)?;
         expr = Expr::Binary(Box::new(expr), BinaryOp::And, Box::new(right));
     }

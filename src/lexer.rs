@@ -65,8 +65,17 @@ impl Lexer {
             '+' => self.add_token(TokenType::Plus),
             '*' => self.add_token(TokenType::Asterisk),
             '%' => self.add_token(TokenType::Percent),
+            '&' => {
+                if self.match_char('&') {
+                    self.add_token(TokenType::LogicalAnd);
+                } else {
+                    self.add_token(TokenType::And);
+                }
+            }
             '|' => {
-                if self.match_char('>') {
+                if self.match_char('|') {
+                    self.add_token(TokenType::LogicalOr);
+                } else if self.match_char('>') {
                     self.add_token(TokenType::PipeArrow);
                 } else {
                     self.add_token(TokenType::Pipe);
