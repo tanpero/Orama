@@ -9,6 +9,7 @@ use crate::ast::EffectHandler;
 use crate::ast::EffectOperation;
 use crate::typechecker;
 use crate::parser::type_parser::parse_type_annotation;
+use crate::parser::Stmt;
 
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     parse_pipe(parser)
@@ -369,19 +370,60 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
 fn parse_if_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     let condition = parse_expression(parser)?;
     
-    let then_branch = parse_block(parser)?;
+    // 解析 then 分支
+    parser.consume(TokenType::LeftBrace, "Expect '{' after if condition")?;
     
+    // 修改这里，解析块内容
+    let (then_stmts, then_expr) = parse_block_contents(parser)?;
+    
+    // 解析可选的 else 分支
     let else_branch = if parser.match_token(&[TokenType::Else]) {
-        if parser.check(&TokenType::If) {
+        if parser.match_token(&[TokenType::If]) {
+            // 嵌套的 if
             Some(Box::new(parse_if_expression(parser)?))
         } else {
-            Some(Box::new(parse_block(parser)?))
+            // else 块
+            parser.consume(TokenType::LeftBrace, "Expect '{' after else")?;
+            let (else_stmts, else_expr) = parse_block_contents(parser)?;
+            Some(Box::new(Expr::Block(else_stmts, else_expr)))
         }
     } else {
         None
     };
     
-    Ok(Expr::If(Box::new(condition), Box::new(then_branch), else_branch))
+    Ok(Expr::If(Box::new(condition), Box::new(Expr::Block(then_stmts, then_expr)), else_branch))
+}
+
+// 新增函数：解析块内容
+fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<Stmt>, Option<Box<Expr>>), ParseError> {
+    let mut statements = Vec::new();
+    
+    // 如果块为空，直接返回
+    if parser.check(&TokenType::RightBrace) {
+        parser.advance(); // 消费右花括号
+        return Ok((statements, None));
+    }
+    
+    // 解析块中的语句和表达式
+    loop {
+        // 检查是否到达块的结尾
+        if parser.check(&TokenType::RightBrace) {
+            parser.advance(); // 消费右花括号
+            return Ok((statements, None));
+        }
+        
+        // 解析一个语句或表达式
+        let expr = parser.expression()?;
+        
+        // 检查是否是块的最后一个表达式
+        if parser.check(&TokenType::RightBrace) {
+            parser.advance(); // 消费右花括号
+            return Ok((statements, Some(Box::new(expr))));
+        }
+        
+        // 不是最后一个表达式，将其作为语句添加
+        statements.push(Stmt::Expression(expr));
+    }
 }
 
 fn parse_block(parser: &mut Parser) -> Result<Expr, ParseError> {
@@ -807,4 +849,13 @@ fn parse_pattern(parser: &mut Parser) -> Result<crate::ast::Pattern, ParseError>
             column: parser.peek().column,
         })
     }
+}
+
+// 添加对块表达式的解析支持
+fn parse_block_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
+    parser.consume(TokenType::LeftBrace, "Expect '{' at the beginning of a block")?;
+    
+    let (statements, expr) = parse_block_contents(parser)?;
+    
+    Ok(Expr::Block(statements, expr))
 }
