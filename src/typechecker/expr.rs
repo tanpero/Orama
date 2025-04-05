@@ -160,22 +160,52 @@ impl<'a> ExprTypeChecker<'a> {
                 Ok(Type::Number)
             }
             // 比较运算符
+            // 相等和不等操作符
             BinaryOp::Equal | BinaryOp::NotEqual => {
-                // 只允许 String 或 Number 类型的相等比较
-                match (&left_type, &right_type) {
-                    (Type::String, Type::String) => Ok(Type::Boolean),
-                    (Type::Number, Type::Number) => Ok(Type::Boolean),
-                    _ => Err(TypeError::TypeMismatch {
-                        expected: "相同的 String 或 Number 类型".to_string(),
-                        actual: format!("左: {}, 右: {}", left_type, right_type),
-                    })
-                }
+            // 如果两边都是 Number 类型，直接返回 Boolean
+            if let (Type::Number, Type::Number) = (&left_type, &right_type) {
+            return Ok(Type::Boolean);
+            }
+            
+            // 如果两边都是 String 类型，直接返回 Boolean
+            if let (Type::String, Type::String) = (&left_type, &right_type) {
+            return Ok(Type::Boolean);
+            }
+            
+            // 如果两边都是 Boolean 类型，直接返回 Boolean
+            if let (Type::Boolean, Type::Boolean) = (&left_type, &right_type) {
+            return Ok(Type::Boolean);
+            }
+            
+            // 尝试统一类型
+            self.checker.unify(&left_type, &right_type)?;
+            Ok(Type::Boolean)
             },
-            BinaryOp::Less | BinaryOp::LessEqual | 
-            BinaryOp::Greater | BinaryOp::GreaterEqual => {
-                // 比较运算符要求两边类型相同，但不限制具体类型
-                self.checker.unify(&left_type, &right_type)?;
-                Ok(Type::Boolean)
+            
+            // 比较操作符
+            BinaryOp::Less | BinaryOp::LessEqual | BinaryOp::Greater | BinaryOp::GreaterEqual => {
+            // 数字比较
+            if let (Type::Number, Type::Number) = (&left_type, &right_type) {
+            return Ok(Type::Boolean);
+            }
+            
+            // 字符串比较
+            if let (Type::String, Type::String) = (&left_type, &right_type) {
+            return Ok(Type::Boolean);
+            }
+            
+            // 尝试统一类型
+            self.checker.unify(&left_type, &right_type)?;
+            
+            // 确保统一后的类型是可比较的
+            let unified_type = self.checker.subst.apply(&left_type);
+            match unified_type {
+            Type::Number | Type::String => Ok(Type::Boolean),
+            _ => Err(TypeError::TypeMismatch {
+            expected: "可比较类型 (Number 或 String)".to_string(),
+            actual: format!("{}", unified_type),
+            }),
+            }
             }
             // 逻辑运算符
             BinaryOp::And | BinaryOp::Or => {
@@ -216,9 +246,18 @@ impl<'a> ExprTypeChecker<'a> {
                 fn_env.new_type_var()
             };
             
-            fn_env.add_var(param.name.clone(), param_type.clone());
-            param_types.push(param_type);
+            param_types.push(param_type.clone());
         }
+        
+        // 创建返回类型变量
+        let return_type = fn_env.new_type_var();
+        
+        // 创建函数类型
+        let fn_type = Type::Function(param_types.clone(), Box::new(return_type.clone()));
+        
+        // 为匿名函数创建一个唯一的名称，以支持递归
+        // 使用一个特殊前缀，避免与用户定义的变量冲突
+        let anonymous_fn_name = format!("__anonymous_fn_{}", self.checker.get_next_var_id());
         
         // 推导函数体类型
         let mut fn_checker = TypeChecker {
@@ -226,20 +265,32 @@ impl<'a> ExprTypeChecker<'a> {
             subst: self.checker.subst.clone(),
         };
         
-        // 创建返回类型变量，用于支持递归
-        let return_type_var = fn_checker.env.new_type_var();
+        // 将匿名函数添加到环境中，以支持递归
+        fn_checker.env.add_var(anonymous_fn_name, fn_type.clone());
+        
+        // 添加参数到环境
+        for (param, param_type) in params.iter().zip(param_types.iter()) {
+            fn_checker.env.add_var(param.name.clone(), param_type.clone());
+        }
         
         // 推导函数体类型
         let body_type = fn_checker.infer_expr(body)?;
         
         // 统一返回类型
-        fn_checker.unify(&return_type_var, &body_type)?;
+        fn_checker.unify(&return_type, &body_type)?;
         
         // 更新替换
         self.checker.subst = fn_checker.subst;
         
         // 返回函数类型
-        Ok(Type::Function(param_types, Box::new(body_type)))
+        Ok(fn_type)
+    }
+    
+    // 辅助方法：获取父级变量名（如果在变量赋值上下文中）
+    fn get_parent_variable_name(&self) -> Option<&String> {
+        // 这个方法需要访问AST上下文，这里是一个简化实现
+        // 实际实现可能需要修改AST遍历逻辑或传递额外上下文
+        None
     }
 
     // 推导 if 表达式类型

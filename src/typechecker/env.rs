@@ -11,7 +11,7 @@ pub struct TypeEnv {
     // 非泛型变量集合
     non_generic: HashSet<TypeVarId>,
     // 下一个可用的类型变量 ID
-    next_var_id: usize,
+    pub next_var_id: usize,
 }
 
 impl TypeEnv {
