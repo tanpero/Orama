@@ -358,16 +358,18 @@ impl Evaluator {
             // 字符串连接
             (Value::String(l), BinaryOp::Add, Value::String(r)) => Ok(Value::String(l.clone() + r)),
 
-            // 比较运算
+            // 比较运算 - 数字
             (Value::Number(l), BinaryOp::Equal, Value::Number(r)) => Ok(Value::Boolean(l == r)),
             (Value::Number(l), BinaryOp::NotEqual, Value::Number(r)) => Ok(Value::Boolean(l != r)),
             (Value::Number(l), BinaryOp::Less, Value::Number(r)) => Ok(Value::Boolean(l < r)),
             (Value::Number(l), BinaryOp::Greater, Value::Number(r)) => Ok(Value::Boolean(l > r)),
             (Value::Number(l), BinaryOp::LessEqual, Value::Number(r)) => Ok(Value::Boolean(l <= r)),
-            (Value::Number(l), BinaryOp::GreaterEqual, Value::Number(r)) => {
-                Ok(Value::Boolean(l >= r))
-            }
-
+            (Value::Number(l), BinaryOp::GreaterEqual, Value::Number(r)) => Ok(Value::Boolean(l >= r)),
+            
+            // 比较运算 - 字符串
+            (Value::String(l), BinaryOp::Equal, Value::String(r)) => Ok(Value::Boolean(l == r)),
+            (Value::String(l), BinaryOp::NotEqual, Value::String(r)) => Ok(Value::Boolean(l != r)),
+            
             // 逻辑运算
             (Value::Boolean(l), BinaryOp::And, Value::Boolean(r)) => Ok(Value::Boolean(*l && *r)),
             (Value::Boolean(l), BinaryOp::Or, Value::Boolean(r)) => Ok(Value::Boolean(*l || *r)),

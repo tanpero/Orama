@@ -137,12 +137,19 @@ impl<'a> ExprTypeChecker<'a> {
                 Ok(Type::Number)
             }
             // 比较运算符
-            BinaryOp::Equal
-            | BinaryOp::NotEqual
-            | BinaryOp::Less
-            | BinaryOp::LessEqual
-            | BinaryOp::Greater
-            | BinaryOp::GreaterEqual => {
+            BinaryOp::Equal | BinaryOp::NotEqual => {
+                // 只允许 String 或 Number 类型的相等比较
+                match (&left_type, &right_type) {
+                    (Type::String, Type::String) => Ok(Type::Boolean),
+                    (Type::Number, Type::Number) => Ok(Type::Boolean),
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: "相同的 String 或 Number 类型".to_string(),
+                        actual: format!("左: {}, 右: {}", left_type, right_type),
+                    })
+                }
+            },
+            BinaryOp::Less | BinaryOp::LessEqual | 
+            BinaryOp::Greater | BinaryOp::GreaterEqual => {
                 // 比较运算符要求两边类型相同，但不限制具体类型
                 self.checker.unify(&left_type, &right_type)?;
                 Ok(Type::Boolean)
