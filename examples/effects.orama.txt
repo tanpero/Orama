@@ -1,21 +1,19 @@
-// 效应声明
 effect State<T> {
-  get: () => T,
-  set: (value: T) => ()
+  get () => T,
+  set (value: T) => ()
 }
 
-// 效应操作使用
 let increment = () => {
   let current = perform State.get()
   perform State.set(current + 1)
   current + 1
 }
 
-// 效应处理器
-let counter = () => 
+let counter = () => {
   handle increment() {
     effect State {
       get: () => resume(0),
       set: (value) => resume(())
     }
   }
+}
