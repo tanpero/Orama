@@ -203,14 +203,10 @@ impl<'a> ExprTypeChecker<'a> {
     }
 
     // 推导函数表达式类型
-    fn infer_function_expr(
-        &mut self,
-        params: &[crate::ast::Parameter],
-        body: &Expr,
-    ) -> TypeResult<Type> {
+    fn infer_function_expr(&mut self, params: &[crate::ast::Parameter], body: &Expr) -> TypeResult<Type> {
         // 创建新的类型环境
         let mut fn_env = self.checker.env.clone_with_non_generic();
-
+        
         // 为每个参数创建类型变量
         let mut param_types = Vec::new();
         for param in params {
@@ -219,36 +215,31 @@ impl<'a> ExprTypeChecker<'a> {
             } else {
                 fn_env.new_type_var()
             };
-
+            
             fn_env.add_var(param.name.clone(), param_type.clone());
             param_types.push(param_type);
         }
-
-        // 创建返回类型变量
-        let return_type_var = fn_env.new_type_var();
-
-        // 构造函数类型并提前添加到环境中，以支持递归
-        let fn_type = Type::Function(param_types.clone(), Box::new(return_type_var.clone()));
-
-        // 为匿名函数添加一个特殊名称，使其可以在函数体内递归调用自身
-        fn_env.add_var("factorial".to_string(), fn_type.clone());
-
+        
         // 推导函数体类型
         let mut fn_checker = TypeChecker {
             env: fn_env,
             subst: self.checker.subst.clone(),
         };
+        
+        // 创建返回类型变量，用于支持递归
+        let return_type_var = fn_checker.env.new_type_var();
+        
+        // 推导函数体类型
         let body_type = fn_checker.infer_expr(body)?;
-
+        
         // 统一返回类型
         fn_checker.unify(&return_type_var, &body_type)?;
-
+        
         // 更新替换
         self.checker.subst = fn_checker.subst;
-
-        // 构造最终函数类型
-        let final_return_type = self.checker.subst.apply(&body_type);
-        Ok(Type::Function(param_types, Box::new(final_return_type)))
+        
+        // 返回函数类型
+        Ok(Type::Function(param_types, Box::new(body_type)))
     }
 
     // 推导 if 表达式类型

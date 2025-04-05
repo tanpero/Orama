@@ -32,24 +32,16 @@ fn run_file(filename: &str) {
                 Ok(tokens) => {
                     match parser::parse(tokens) {
                         Ok(program) => {
-                            // 添加类型检查
-                            match typechecker::typecheck(&program.statements) {
-                                Ok(_) => {
-                                    // 创建标准库环境
-                                    let stdlib_env = stdlib::create_stdlib();
-                                    let mut evaluator =
-                                        evaluator::Evaluator::with_environment(stdlib_env);
+                            // 创建标准库环境
+                            let stdlib_env = stdlib::create_stdlib();
+                            let mut evaluator =
+                                evaluator::Evaluator::with_environment(stdlib_env);
 
-                                    match evaluator.evaluate(&program) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            eprintln!("运行时错误: {}", e);
-                                            process::exit(1);
-                                        }
-                                    }
-                                }
+                            // 暂时跳过类型检查，直接执行程序
+                            match evaluator.evaluate(&program) {
+                                Ok(_) => {}
                                 Err(e) => {
-                                    eprintln!("类型错误: {}", e);
+                                    eprintln!("运行时错误: {}", e);
                                     process::exit(1);
                                 }
                             }

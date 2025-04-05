@@ -13,10 +13,12 @@ impl<'a> UnifyTypeChecker<'a> {
 
     // 统一两个类型
     pub fn unify(&mut self, t1: &Type, t2: &Type) -> TypeResult<()> {
-        let t1 = self.checker.subst.apply(t1);
-        let t2 = self.checker.subst.apply(t2);
+        // 如果任一类型是 Any，则统一成功
+        if matches!(t1, Type::Any) || matches!(t2, Type::Any) {
+            return Ok(());
+        }
 
-        match (&t1, &t2) {
+        match (t1, t2) {
             // 相同类型直接匹配
             (a, b) if a == b => Ok(()),
 

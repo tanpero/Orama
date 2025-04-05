@@ -1,50 +1,25 @@
-// 猜数字游戏
-// 游戏会随机生成一个1-100之间的数字，玩家需要猜出这个数字
-// 每次猜测后，游戏会提示数字是太大还是太小
 
-let main = () {
-  // 打印欢迎信息
-  println("欢迎来到猜数字游戏！")
-  println("我已经想好了一个1到100之间的数字，请你猜一猜。")
-  
-  // 生成1-100之间的随机数
-  let target = floor(random() * 100) + 1
-  
-  // 开始游戏
-  gameLoop(target, 0)
-  1
-}
-
-// 递归函数来模拟变量变化
-let gameLoop = (target, attempts) {
-  // 获取玩家输入
-  let guess = to_number(input("请输入你的猜测 (1-100):"))
-  
-  // 检查猜测结果
+let gameLoop = (target, attempts) => {  
+  let guess = to_number(input("请输入你的猜测 (1-100):")) 
   if guess == target {
     println("恭喜你猜对了！目标数字就是 " + to_string(target))
-    println("你总共猜了 " + to_string(attempts + 1) + " 次。")
+    println("你总共猜了 " + to_string(attempts + 1) + " 次。")    
     
-    // 询问是否再玩一次
     let playAgain = input("想再玩一次吗？(y/n):")
-    if playAgain == "y" || playAgain == "Y" {
-      // 重置游戏
+    if playAgain == "y" || playAgain == "Y" {      
       let newTarget = floor(random() * 100) + 1
       println("好的！我又想好了一个新数字。")
       gameLoop(newTarget, 0)
     } else {
       println("谢谢参与，下次再见！")
     }
-  } else if guess < target {
-    println("太小了！再试一次。")
-    gameLoop(target, attempts + 1)
   } else {
-    println("太大了！再试一次。")
-    gameLoop(target, attempts + 1)
+    if guess < target {
+      println("太小了！再试一次。")
+      gameLoop(target, attempts + 1)
+    } else {
+      println("太大了！再试一次。")
+      gameLoop(target, attempts + 1)
+    }
   }
-
-  1
 }
-
-// 运行游戏
-main()
