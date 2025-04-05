@@ -38,7 +38,7 @@ where
         .define(name.to_string(), Value::NativeFunction(native_fn));
 }
 
-// 格式化值为字符串
+// 格式化值为字符串（带类型信息，用于REPL）
 pub fn format_value(value: &Value) -> String {
     let type_name = match value {
         Value::Number(_) => "Number",
@@ -100,6 +100,31 @@ pub fn format_value(value: &Value) -> String {
         Value::Effect(_) => "<effect>: Effect".to_string(),
         Value::Null => "null: Null".to_string(),
         Value::Unit => "(): Unit".to_string(),
+    }
+}
+
+// 格式化值为字符串（仅显示值，用于标准库函数）
+pub fn format_value_simple(value: &Value) -> String {
+    match value {
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => s.clone(),
+        Value::Boolean(b) => b.to_string(),
+        Value::Array(items) => {
+            let items_str: Vec<String> = items.iter().map(|i| format_value_simple(i)).collect();
+            format!("[{}]", items_str.join(", "))
+        },
+        Value::Object(fields) => {
+            let fields_str: Vec<String> = fields
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, format_value_simple(v)))
+                .collect();
+            format!("{{{}}}", fields_str.join(", "))
+        },
+        Value::Function(_) => "<function>".to_string(),
+        Value::NativeFunction(_) => "<native function>".to_string(),
+        Value::Effect(_) => "<effect>".to_string(),
+        Value::Null => "null".to_string(),
+        Value::Unit => "()".to_string(),
     }
 }
 

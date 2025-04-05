@@ -1,25 +1,29 @@
-
-let gameLoop = (target, attempts) => {  
-  let guess = to_number(input("请输入你的猜测 (1-100):")) 
+let gameLoop = (target: Number, attempts: Number) => {
+  let guess = to_number(input("请输入你的猜测 (1-100):"))
   if guess == target {
     println("恭喜你猜对了！目标数字就是 " + to_string(target))
-    println("你总共猜了 " + to_string(attempts + 1) + " 次。")    
-    
+    println("你总共猜了 " + to_string(attempts + 1) + " 次。")  
     let playAgain = input("想再玩一次吗？(y/n):")
     if playAgain == "y" || playAgain == "Y" {      
       let newTarget = floor(random() * 100) + 1
       println("好的！我又想好了一个新数字。")
-      gameLoop(newTarget, 0)
+      gameLoop(newTarget, attempts + 1)
     } else {
       println("谢谢参与，下次再见！")
     }
+  } else if guess < target {
+    println("太小了！再试一次。")
+    gameLoop(target, attempts + 1)
   } else {
-    if guess < target {
-      println("太小了！再试一次。")
-      gameLoop(target, attempts + 1)
-    } else {
-      println("太大了！再试一次。")
-      gameLoop(target, attempts + 1)
-    }
+    println("太大了！再试一次。")
+    gameLoop(target, attempts + 1)
   }
 }
+
+let main = () {  
+  println("欢迎来到猜数字游戏！")
+  println("我已经想好了一个1到100之间的数字，请你猜一猜。")
+  let target = floor(random() * 100) + 1
+  gameLoop(target, 0)
+}
+main()

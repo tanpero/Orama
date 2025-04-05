@@ -1,4 +1,4 @@
-use super::format_value;
+use super::format_value_simple;
 use crate::runtime::{Environment, Value};
 use std::cell::RefCell;
 use std::io::{self, BufRead, Write};
@@ -7,7 +7,7 @@ use std::rc::Rc;
 pub fn register(env: &Rc<RefCell<Environment>>) {
     super::add_native_fn(env, "print", vec!["value"], |args, _| {
         if let Some(value) = args.get(0) {
-            print!("{}", format_value(value));
+            print!("{}", format_value_simple(value));
             Ok(Value::Null)
         } else {
             print!("{}", "".to_string());
@@ -18,7 +18,7 @@ pub fn register(env: &Rc<RefCell<Environment>>) {
     // 添加 println 函数 - 与 print 类似但总是添加换行符
     super::add_native_fn(env, "println", vec!["value"], |args, _| {
         if let Some(value) = args.get(0) {
-            println!("{}", format_value(value));
+            println!("{}", format_value_simple(value));
         } else {
             println!();
         }
@@ -28,7 +28,7 @@ pub fn register(env: &Rc<RefCell<Environment>>) {
     // 添加 input 函数 - 从标准输入读取一行文本
     super::add_native_fn(env, "input", vec!["prompt"], |args, _| {
         if let Some(prompt) = args.get(0) {
-            print!("{}\n", format_value(prompt));
+            print!("{}\n", format_value_simple(prompt));
             io::stdout().flush().unwrap();
         }
 
@@ -55,14 +55,14 @@ pub fn register(env: &Rc<RefCell<Environment>>) {
                 if args.len() > 1 {
                     for (i, arg) in args.iter().skip(1).enumerate() {
                         let placeholder = format!("{{{}}}", i);
-                        result = result.replace(&placeholder, &format_value(arg));
+                        result = result.replace(&placeholder, &format_value_simple(arg));
                     }
                 }
 
                 print!("{}", result);
                 io::stdout().flush().unwrap();
             } else {
-                print!("{}", format_value(format_str));
+                print!("{}", format_value_simple(format_str));
                 io::stdout().flush().unwrap();
             }
         }
