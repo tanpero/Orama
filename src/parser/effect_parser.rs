@@ -1,7 +1,7 @@
-use crate::ast::{Expr, EffectHandler, EffectOperation, ReturnHandler, Parameter};
+use super::parse_expression;
+use crate::ast::{EffectHandler, EffectOperation, Expr, Parameter, ReturnHandler};
 use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
-use super::parse_expression;
 
 pub fn parse_perform(parser: &mut Parser) -> Result<Expr, ParseError> {
     let effect_name = if let TokenType::Identifier(name) = &parser.peek().token_type {

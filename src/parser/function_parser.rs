@@ -1,9 +1,9 @@
+use crate::ast::Literal;
 use crate::ast::{Expr, Parameter};
+use crate::parser::expr_parser::{parse_block_contents, parse_expression};
+use crate::parser::type_parser::parse_type_annotation;
 use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
-use crate::parser::expr_parser::{parse_expression, parse_block_contents};
-use crate::parser::type_parser::parse_type_annotation;
-use crate::ast::Literal;
 
 pub fn parse_empty_param_function(parser: &mut Parser) -> Result<Expr, ParseError> {
     // 解析空参数函数
@@ -17,7 +17,10 @@ pub fn parse_empty_param_function(parser: &mut Parser) -> Result<Expr, ParseErro
             // 是块函数体，不是对象字面量
             parser.advance(); // 消费左大括号
             let (stmts, expr) = parse_block_contents(parser)?;
-            return Ok(Expr::Function(Vec::new(), Box::new(Expr::Block(stmts, expr))));
+            return Ok(Expr::Function(
+                Vec::new(),
+                Box::new(Expr::Block(stmts, expr)),
+            ));
         } else {
             // 普通表达式函数体
             let body = parse_expression(parser)?;
@@ -49,7 +52,10 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
                 // 是块函数体，不是对象字面量
                 parser.advance(); // 消费左大括号
                 let (stmts, expr) = parse_block_contents(parser)?;
-                return Ok(Expr::Function(Vec::new(), Box::new(Expr::Block(stmts, expr))));
+                return Ok(Expr::Function(
+                    Vec::new(),
+                    Box::new(Expr::Block(stmts, expr)),
+                ));
             } else {
                 // 普通表达式函数体
                 let body = parse_expression(parser)?;
@@ -125,7 +131,8 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
 
             if parser.match_token(&[TokenType::FatArrow]) {
                 // 检查是否是块函数体
-                if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon) {
+                if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon)
+                {
                     // 是块函数体，不是对象字面量
                     parser.advance(); // 消费左大括号
                     let (stmts, expr) = parse_block_contents(parser)?;
@@ -160,13 +167,18 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
                         name,
                         type_annotation: None,
                     };
-                    
+
                     // 检查是否是块函数体
-                    if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon) {
+                    if parser.check(&TokenType::LeftBrace)
+                        && !parser.check_ahead(1, &TokenType::Colon)
+                    {
                         // 是块函数体，不是对象字面量
                         parser.advance(); // 消费左大括号
                         let (stmts, expr) = parse_block_contents(parser)?;
-                        return Ok(Expr::Function(vec![param], Box::new(Expr::Block(stmts, expr))));
+                        return Ok(Expr::Function(
+                            vec![param],
+                            Box::new(Expr::Block(stmts, expr)),
+                        ));
                     } else {
                         // 普通表达式函数体
                         let body = parse_expression(parser)?;
@@ -199,4 +211,3 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
         }
     }
 }
-

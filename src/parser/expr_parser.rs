@@ -3,10 +3,10 @@ use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
 
 // Fixing imports to use the correct paths
+use crate::parser::control_flow_parser;
+use crate::parser::function_parser;
 use crate::parser::function_parser::*;
 use crate::parser::literal_parser;
-use crate::parser::function_parser;
-use crate::parser::control_flow_parser;
 
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     // 检查是否是函数表达式
@@ -238,7 +238,9 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
 }
 
 // Make sure this function is public and exported
-pub fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<crate::parser::Stmt>, Option<Box<Expr>>), ParseError> {
+pub fn parse_block_contents(
+    parser: &mut Parser,
+) -> Result<(Vec<crate::parser::Stmt>, Option<Box<Expr>>), ParseError> {
     let mut statements = Vec::new();
     let mut last_expr = None;
 

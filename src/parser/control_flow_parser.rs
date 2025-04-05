@@ -1,7 +1,7 @@
 use crate::ast::{Expr, MatchCase, Pattern};
+use crate::parser::expr_parser::{parse_block_contents, parse_expression};
 use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
-use crate::parser::expr_parser::{parse_expression, parse_block_contents};
 
 pub fn parse_if_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     let condition = parse_expression(parser)?;

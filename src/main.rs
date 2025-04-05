@@ -34,8 +34,7 @@ fn run_file(filename: &str) {
                         Ok(program) => {
                             // 创建标准库环境
                             let stdlib_env = stdlib::create_stdlib();
-                            let mut evaluator =
-                                evaluator::Evaluator::with_environment(stdlib_env);
+                            let mut evaluator = evaluator::Evaluator::with_environment(stdlib_env);
 
                             // 暂时跳过类型检查，直接执行程序
                             match evaluator.evaluate(&program) {

@@ -71,7 +71,9 @@ pub fn register(env: &Rc<RefCell<Environment>>) {
                     let start = match &args[1] {
                         Value::Number(n) => *n as usize,
                         _ => {
-                            return Err(RuntimeError::TypeError("start 参数必须是数字".to_string()));
+                            return Err(RuntimeError::TypeError(
+                                "start 参数必须是数字".to_string(),
+                            ));
                         }
                     };
 

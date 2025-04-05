@@ -29,12 +29,16 @@ impl<'a> UnifyTypeChecker<'a> {
             (Type::Array(a), Type::Array(b)) => self.unify(a, b),
 
             // 处理 List<T> 与 [T] 的等价关系
-            (Type::Generic(name1, args1), Type::Array(elem_type)) if name1 == "List" && args1.len() == 1 => {
+            (Type::Generic(name1, args1), Type::Array(elem_type))
+                if name1 == "List" && args1.len() == 1 =>
+            {
                 self.unify(&args1[0], elem_type)
-            },
-            (Type::Array(elem_type), Type::Generic(name2, args2)) if name2 == "List" && args2.len() == 1 => {
+            }
+            (Type::Array(elem_type), Type::Generic(name2, args2))
+                if name2 == "List" && args2.len() == 1 =>
+            {
                 self.unify(elem_type, &args2[0])
-            },
+            }
 
             // 函数类型
             (Type::Function(params1, ret1), Type::Function(params2, ret2)) => {

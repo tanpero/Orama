@@ -18,7 +18,7 @@ use types::Type;
 pub fn typecheck(stmts: &[Stmt]) -> TypeResult<Type> {
     let mut checker = TypeChecker::new();
     checker.init_builtins();
-    
+
     // 第一遍：注册所有函数声明的类型
     for stmt in stmts {
         if let Stmt::VariableDecl(name, _, expr) = stmt {
@@ -29,14 +29,14 @@ pub fn typecheck(stmts: &[Stmt]) -> TypeResult<Type> {
                 for _ in params {
                     param_types.push(Type::Any); // 暂时使用Any类型
                 }
-                
+
                 // 创建函数类型并添加到环境
                 let fn_type = Type::Function(param_types, Box::new(Type::Any));
                 checker.env.add_var(name.clone(), fn_type);
             }
         }
     }
-    
+
     // 第二遍：实际检查所有语句
     checker.infer_program(stmts)
 }

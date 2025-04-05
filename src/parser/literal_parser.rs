@@ -1,8 +1,8 @@
+use super::parse_expression;
 use crate::ast::{BinaryOp, Expr, Literal};
 use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
 use crate::typechecker;
-use super::parse_expression;
 
 pub fn parse_array_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
     let mut elements = Vec::new();

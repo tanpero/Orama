@@ -2,10 +2,10 @@ pub mod expr_parser;
 pub mod stmt_parser;
 pub mod type_parser;
 // 新增的子模块
-pub mod literal_parser;
-pub mod function_parser;
 pub mod control_flow_parser;
 pub mod effect_parser;
+pub mod function_parser;
+pub mod literal_parser;
 
 use crate::ast::{Program, Stmt};
 use crate::token::{Token, TokenType};
@@ -169,9 +169,9 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
 
 // 重新导出常用的解析函数，使其可以直接从parser模块访问
 // Add parse_block_contents to the re-exports
-pub use expr_parser::{parse_expression, parse_block_contents};
-pub use type_parser::parse_type_annotation;
-pub use literal_parser::{parse_array_literal, parse_object_literal, parse_index_access};
-pub use function_parser::{parse_empty_param_function, parse_parenthesized_expr_or_function};
 pub use control_flow_parser::{parse_if_expression, parse_match_expression, parse_pattern};
-pub use effect_parser::{parse_perform, parse_handle};
+pub use effect_parser::{parse_handle, parse_perform};
+pub use expr_parser::{parse_block_contents, parse_expression};
+pub use function_parser::{parse_empty_param_function, parse_parenthesized_expr_or_function};
+pub use literal_parser::{parse_array_literal, parse_index_access, parse_object_literal};
+pub use type_parser::parse_type_annotation;

@@ -112,14 +112,14 @@ pub fn format_value_simple(value: &Value) -> String {
         Value::Array(items) => {
             let items_str: Vec<String> = items.iter().map(|i| format_value_simple(i)).collect();
             format!("[{}]", items_str.join(", "))
-        },
+        }
         Value::Object(fields) => {
             let fields_str: Vec<String> = fields
                 .iter()
                 .map(|(k, v)| format!("{}: {}", k, format_value_simple(v)))
                 .collect();
             format!("{{{}}}", fields_str.join(", "))
-        },
+        }
         Value::Function(_) => "<function>".to_string(),
         Value::NativeFunction(_) => "<native function>".to_string(),
         Value::Effect(_) => "<effect>".to_string(),
