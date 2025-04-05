@@ -110,24 +110,47 @@ impl<'a> ExprTypeChecker<'a> {
                 if let (Type::Number, Type::Number) = (&left_type, &right_type) {
                     return Ok(Type::Number);
                 }
-    
+                
                 // 尝试作为字符串处理
                 if let (Type::String, Type::String) = (&left_type, &right_type) {
                     return Ok(Type::String);
                 }
-    
-                // 如果左右类型相同，统一它们
-                self.checker.unify(&left_type, &right_type)?;
-    
-                // 根据统一后的类型决定结果类型
-                let unified_type = self.checker.subst.apply(&left_type);
-                match unified_type {
-                    Type::Number => Ok(Type::Number),
-                    Type::String => Ok(Type::String),
-                    _ => Err(TypeError::TypeMismatch {
-                        expected: "Number 或 String".to_string(),
-                        actual: format!("{}", unified_type),
-                    }),
+                
+                // 处理类型变量的情况
+                match (&left_type, &right_type) {
+                    // 如果两边都是类型变量，默认推断为数字类型
+                    (Type::Var(_), Type::Var(_)) => {
+                        self.checker.unify(&left_type, &Type::Number)?;
+                        self.checker.unify(&right_type, &Type::Number)?;
+                        return Ok(Type::Number);
+                    },
+                    // 如果左边是类型变量，右边有具体类型
+                    (Type::Var(_), _) => {
+                        self.checker.unify(&left_type, &right_type)?;
+                        return Ok(right_type);
+                    },
+                    // 如果右边是类型变量，左边有具体类型
+                    (_, Type::Var(_)) => {
+                        self.checker.unify(&right_type, &left_type)?;
+                        return Ok(left_type);
+                    },
+                    // 处理 Any 类型的情况
+                    (Type::Any, Type::Any) => return Ok(Type::Number),
+                    (Type::Any, _) => return Ok(right_type),
+                    (_, Type::Any) => return Ok(left_type),
+                    // 其他情况尝试统一类型
+                    _ => {
+                        self.checker.unify(&left_type, &right_type)?;
+                        let unified_type = self.checker.subst.apply(&left_type);
+                        match unified_type {
+                            Type::Number => Ok(Type::Number),
+                            Type::String => Ok(Type::String),
+                            _ => Err(TypeError::TypeMismatch {
+                                expected: "Number 或 String".to_string(),
+                                actual: format!("{}", unified_type),
+                            })
+                        }
+                    }
                 }
             }
             // 算术运算符
