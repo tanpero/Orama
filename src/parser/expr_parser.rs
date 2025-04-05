@@ -2,14 +2,11 @@ use crate::ast::{BinaryOp, Expr, Literal, Parameter, UnaryOp};
 use crate::parser::{ParseError, Parser};
 use crate::token::TokenType;
 
-use crate::ast::EffectHandler;
-use crate::ast::EffectOperation;
-use crate::ast::MatchCase;
-use crate::ast::Pattern;
-use crate::ast::ReturnHandler;
-use crate::parser::Stmt;
-use crate::parser::type_parser::parse_type_annotation;
-use crate::typechecker;
+// Fixing imports to use the correct paths
+use crate::parser::function_parser::*;
+use crate::parser::literal_parser;
+use crate::parser::function_parser;
+use crate::parser::control_flow_parser;
 
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
     // 检查是否是函数表达式
@@ -18,31 +15,7 @@ pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
         && (parser.check_ahead(2, &TokenType::FatArrow)
             || parser.check_ahead(2, &TokenType::LeftBrace))
     {
-        // 解析空参数函数
-        parser.advance(); // 消费左括号
-        parser.advance(); // 消费右括号
-
-        if parser.match_token(&[TokenType::FatArrow]) {
-            // 箭头函数
-            // 检查是否是块函数体
-            if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon) {
-                // 是块函数体，不是对象字面量
-                parser.advance(); // 消费左大括号
-                let (stmts, expr) = parse_block_contents(parser)?;
-                return Ok(Expr::Function(Vec::new(), Box::new(Expr::Block(stmts, expr))));
-            } else {
-                // 普通表达式函数体
-                let body = parse_expression(parser)?;
-                return Ok(Expr::Function(Vec::new(), Box::new(body)));
-            }
-        } else if parser.match_token(&[TokenType::LeftBrace]) {
-            // 块函数
-            let (stmts, expr) = parse_block_contents(parser)?;
-            return Ok(Expr::Function(
-                Vec::new(),
-                Box::new(Expr::Block(stmts, expr)),
-            ));
-        }
+        return parse_empty_param_function(parser);
     }
 
     parse_pipe(parser)
@@ -181,7 +154,7 @@ fn parse_call(parser: &mut Parser) -> Result<Expr, ParseError> {
             expr = finish_call(parser, expr)?;
         } else if parser.match_token(&[TokenType::LeftBracket]) {
             // 处理索引访问
-            expr = parse_index_access(parser, expr)?;
+            expr = literal_parser::parse_index_access(parser, expr)?;
         } else {
             break;
         }
@@ -207,33 +180,6 @@ fn finish_call(parser: &mut Parser, callee: Expr) -> Result<Expr, ParseError> {
     Ok(Expr::Call(Box::new(callee), arguments))
 }
 
-fn parse_array_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
-    let mut elements = Vec::new();
-
-    if !parser.check(&TokenType::RightBracket) {
-        loop {
-            elements.push(parse_expression(parser)?);
-
-            if !parser.match_token(&[TokenType::Comma]) {
-                break;
-            }
-        }
-    }
-
-    parser.consume(TokenType::RightBracket, "Expect ']' after array elements")?;
-
-    // 进行类型检查
-    let array_literal = Literal::Array(elements.clone());
-    match typechecker::check_literal(&array_literal) {
-        Ok(_) => Ok(Expr::Literal(array_literal)),
-        Err(err) => Err(ParseError::InvalidSyntax(
-            format!("数组类型检查错误: {}", err),
-            parser.previous().line,
-            parser.previous().column,
-        )),
-    }
-}
-
 fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     if parser.match_token(&[TokenType::False]) {
         return Ok(Expr::Literal(Literal::Boolean(false)));
@@ -245,15 +191,15 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
         return Ok(Expr::Literal(Literal::Null));
     }
     if parser.match_token(&[TokenType::LeftBrace]) {
-        return parse_object_literal(parser);
+        return literal_parser::parse_object_literal(parser);
     }
     // 添加对 if 表达式的支持
     if parser.match_token(&[TokenType::If]) {
-        return parse_if_expression(parser);
+        return control_flow_parser::parse_if_expression(parser);
     }
 
     if parser.match_token(&[TokenType::Match]) {
-        return parse_match_expression(parser);
+        return control_flow_parser::parse_match_expression(parser);
     }
 
     if let TokenType::Number(n) = parser.peek().token_type {
@@ -275,148 +221,11 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
 
     // 添加对数组字面量的支持
     if parser.match_token(&[TokenType::LeftBracket]) {
-        return parse_array_literal(parser);
+        return literal_parser::parse_array_literal(parser);
     }
 
     if parser.match_token(&[TokenType::LeftParen]) {
-        if parser.match_token(&[TokenType::RightParen]) {
-            // 空参数列表的函数
-            if parser.match_token(&[TokenType::FatArrow]) {
-                // 检查是否是块函数体
-                if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon) {
-                    // 是块函数体，不是对象字面量
-                    parser.advance(); // 消费左大括号
-                    let (stmts, expr) = parse_block_contents(parser)?;
-                    return Ok(Expr::Function(Vec::new(), Box::new(Expr::Block(stmts, expr))));
-                } else {
-                    // 普通表达式函数体
-                    let body = parse_expression(parser)?;
-                    return Ok(Expr::Function(Vec::new(), Box::new(body)));
-                }
-            } else if parser.match_token(&[TokenType::LeftBrace]) {
-                // 支持块状函数体（空参数情况）
-                let (stmts, expr) = parse_block_contents(parser)?;
-                return Ok(Expr::Function(
-                    Vec::new(),
-                    Box::new(Expr::Block(stmts, expr)),
-                ));
-            }
-            return Ok(Expr::Literal(Literal::Unit)); // 返回单元类型
-        } else {
-            // 修改这里，支持多参数函数定义
-            let mut params = Vec::new();
-
-            // 解析第一个参数
-            if let TokenType::Identifier(name) = &parser.peek().token_type {
-                let name = name.clone();
-                parser.advance();
-
-                // 解析可选的类型注解
-                let type_annotation = if parser.match_token(&[TokenType::Colon]) {
-                    Some(parse_type_annotation(parser)?)
-                } else {
-                    None
-                };
-
-                let param = Parameter {
-                    name,
-                    type_annotation,
-                };
-                params.push(param);
-
-                // 解析后续参数
-                while parser.match_token(&[TokenType::Comma]) {
-                    if let TokenType::Identifier(name) = &parser.peek().token_type {
-                        let name = name.clone();
-                        parser.advance();
-
-                        // 解析可选的类型注解
-                        let type_annotation = if parser.match_token(&[TokenType::Colon]) {
-                            Some(parse_type_annotation(parser)?)
-                        } else {
-                            None
-                        };
-
-                        let param = Parameter {
-                            name,
-                            type_annotation,
-                        };
-                        params.push(param);
-                    } else {
-                        return Err(ParseError::UnexpectedToken {
-                            expected: "parameter name".to_string(),
-                            found: format!("{:?}", parser.peek().token_type),
-                            line: parser.peek().line,
-                            column: parser.peek().column,
-                        });
-                    }
-                }
-
-                parser.consume(TokenType::RightParen, "Expect ')' after parameters")?;
-
-                // 解析可选的返回类型注解
-                let return_type_annotation = if parser.match_token(&[TokenType::Colon]) {
-                    Some(parse_type_annotation(parser)?)
-                } else {
-                    None
-                };
-
-                if parser.match_token(&[TokenType::FatArrow]) {
-                    let body = parse_expression(parser)?;
-                    return Ok(Expr::Function(params, Box::new(body)));
-                } else if parser.match_token(&[TokenType::LeftBrace]) {
-                    // 支持块状函数体
-                    let (stmts, expr) = parse_block_contents(parser)?;
-                    return Ok(Expr::Function(params, Box::new(Expr::Block(stmts, expr))));
-                } else {
-                    // 不是函数定义，回退到表达式解析
-                    return Err(ParseError::UnexpectedToken {
-                        expected: "'=>' or '{'".to_string(),
-                        found: format!("{:?}", parser.peek().token_type),
-                        line: parser.peek().line,
-                        column: parser.peek().column,
-                    });
-                }
-            } else {
-                // 不是参数名，可能是分组表达式
-                let expr = parse_expression(parser)?;
-                parser.consume(TokenType::RightParen, "Expect ')' after expression")?;
-
-                if parser.match_token(&[TokenType::FatArrow]) {
-                    // 尝试将表达式作为单参数处理
-                    if let Expr::Variable(name) = expr {
-                        let param = Parameter {
-                            name,
-                            type_annotation: None,
-                        };
-                        let body = parse_expression(parser)?;
-                        return Ok(Expr::Function(vec![param], Box::new(body)));
-                    } else {
-                        return Err(ParseError::InvalidSyntax(
-                            "Expected parameter name".to_string(),
-                            parser.previous().line,
-                            parser.previous().column,
-                        ));
-                    }
-                } else if parser.match_token(&[TokenType::LeftBrace])
-                    && matches!(expr, Expr::Variable(_))
-                {
-                    // 支持块状函数体（单参数情况）
-                    if let Expr::Variable(name) = expr {
-                        let param = Parameter {
-                            name,
-                            type_annotation: None,
-                        };
-                        let (stmts, expr) = parse_block_contents(parser)?;
-                        return Ok(Expr::Function(
-                            vec![param],
-                            Box::new(Expr::Block(stmts, expr)),
-                        ));
-                    }
-                }
-                return Ok(expr);
-            }
-        }
+        return function_parser::parse_parenthesized_expr_or_function(parser);
     }
 
     // 添加一个 else 子句，处理所有其他情况
@@ -428,40 +237,8 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     })
 }
 
-fn parse_if_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
-    let condition = parse_expression(parser)?;
-
-    // 解析 then 分支
-    parser.consume(TokenType::LeftBrace, "Expect '{' after if condition")?;
-
-    // 修改这里，解析块内容
-    let (then_stmts, then_expr) = parse_block_contents(parser)?;
-
-    // 解析可选的 else 分支
-    let else_branch = if parser.match_token(&[TokenType::Else]) {
-        if parser.match_token(&[TokenType::If]) {
-            // 嵌套的 if
-            Some(Box::new(parse_if_expression(parser)?))
-        } else {
-            // else 块
-            parser.consume(TokenType::LeftBrace, "Expect '{' after else")?;
-            let (else_stmts, else_expr) = parse_block_contents(parser)?;
-            Some(Box::new(Expr::Block(else_stmts, else_expr)))
-        }
-    } else {
-        None
-    };
-
-    Ok(Expr::If(
-        Box::new(condition),
-        Box::new(Expr::Block(then_stmts, then_expr)),
-        else_branch,
-    ))
-}
-
-// 新增函数：解析块内容
-// 在文件末尾添加这个新函数
-fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<Stmt>, Option<Box<Expr>>), ParseError> {
+// Make sure this function is public and exported
+pub fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<crate::parser::Stmt>, Option<Box<Expr>>), ParseError> {
     let mut statements = Vec::new();
     let mut last_expr = None;
 
@@ -481,7 +258,7 @@ fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<Stmt>, Option<Box<Ex
                 last_expr = Some(Box::new(expr));
             } else {
                 // 否则将其作为表达式语句添加
-                statements.push(Stmt::Expression(expr));
+                statements.push(crate::parser::Stmt::Expression(expr));
             }
         }
     }
@@ -489,442 +266,4 @@ fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<Stmt>, Option<Box<Ex
     parser.consume(TokenType::RightBrace, "Expect '}' after block")?;
 
     Ok((statements, last_expr))
-}
-
-fn parse_block(parser: &mut Parser) -> Result<Expr, ParseError> {
-    parser.consume(TokenType::LeftBrace, "Expect '{' before block")?;
-
-    let mut statements = Vec::new();
-    let mut final_expr = None;
-
-    // 如果块为空或只有一个表达式
-    if !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-        // 检查是否是语句（以 let, effect, type 开头）
-        if parser.check(&TokenType::Let)
-            || parser.check(&TokenType::Effect)
-            || parser.check(&TokenType::Type)
-        {
-            // 解析语句序列
-            while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-                statements.push(parser.statement()?);
-            }
-        } else {
-            // 只有一个表达式
-            final_expr = Some(Box::new(parse_expression(parser)?));
-        }
-    }
-
-    parser.consume(TokenType::RightBrace, "Expect '}' after block")?;
-
-    Ok(Expr::Block(statements, final_expr))
-}
-
-fn parse_perform(parser: &mut Parser) -> Result<Expr, ParseError> {
-    let effect_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
-        name.clone()
-    } else {
-        return Err(ParseError::UnexpectedToken {
-            expected: "effect name".to_string(),
-            found: format!("{:?}", parser.peek().token_type),
-            line: parser.peek().line,
-            column: parser.peek().column,
-        });
-    };
-    parser.advance();
-
-    parser.consume(TokenType::Dot, "Expect '.' after effect name")?;
-
-    let operation_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
-        name.clone()
-    } else {
-        return Err(ParseError::UnexpectedToken {
-            expected: "operation name".to_string(),
-            found: format!("{:?}", parser.peek().token_type),
-            line: parser.peek().line,
-            column: parser.peek().column,
-        });
-    };
-    parser.advance();
-
-    parser.consume(TokenType::LeftParen, "Expect '(' after operation name")?;
-
-    let mut arguments = Vec::new();
-    if !parser.check(&TokenType::RightParen) {
-        loop {
-            arguments.push(parse_expression(parser)?);
-            if !parser.match_token(&[TokenType::Comma]) {
-                break;
-            }
-        }
-    }
-
-    parser.consume(TokenType::RightParen, "Expect ')' after arguments")?;
-
-    Ok(Expr::Perform(effect_name, operation_name, arguments))
-}
-
-fn parse_handle(parser: &mut Parser) -> Result<Expr, ParseError> {
-    // 解析被处理的表达式
-    let expr = parse_expression(parser)?;
-
-    parser.consume(
-        TokenType::LeftBrace,
-        "Expect '{' after expression in handle",
-    )?;
-
-    // 解析效应处理器
-    let mut handlers = Vec::new();
-    let mut return_handler = None;
-
-    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-        if parser.match_token(&[TokenType::Effect]) {
-            // 解析效应处理器
-            let effect_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
-                name.clone()
-            } else {
-                return Err(ParseError::UnexpectedToken {
-                    expected: "effect name".to_string(),
-                    found: format!("{:?}", parser.peek().token_type),
-                    line: parser.peek().line,
-                    column: parser.peek().column,
-                });
-            };
-            parser.advance();
-
-            parser.consume(TokenType::LeftBrace, "Expect '{' after effect name")?;
-
-            let mut operations = Vec::new();
-
-            while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-                // 解析操作名
-                let op_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
-                    name.clone()
-                } else {
-                    return Err(ParseError::UnexpectedToken {
-                        expected: "operation name".to_string(),
-                        found: format!("{:?}", parser.peek().token_type),
-                        line: parser.peek().line,
-                        column: parser.peek().column,
-                    });
-                };
-                parser.advance();
-
-                parser.consume(TokenType::Colon, "Expect ':' after operation name")?;
-                parser.consume(TokenType::LeftParen, "Expect '(' after ':'")?;
-
-                // 解析参数
-                let mut params = Vec::new();
-                if !parser.check(&TokenType::RightParen) {
-                    loop {
-                        let param_name =
-                            if let TokenType::Identifier(name) = &parser.peek().token_type {
-                                name.clone()
-                            } else {
-                                return Err(ParseError::UnexpectedToken {
-                                    expected: "parameter name".to_string(),
-                                    found: format!("{:?}", parser.peek().token_type),
-                                    line: parser.peek().line,
-                                    column: parser.peek().column,
-                                });
-                            };
-                        parser.advance();
-
-                        // 这里可以添加对类型注解的支持
-                        let param = Parameter {
-                            name: param_name,
-                            type_annotation: None,
-                        };
-                        params.push(param);
-
-                        if !parser.match_token(&[TokenType::Comma]) {
-                            break;
-                        }
-                    }
-                }
-
-                parser.consume(TokenType::RightParen, "Expect ')' after parameters")?;
-                parser.consume(TokenType::FatArrow, "Expect '=>' after parameters")?;
-
-                // 解析操作体
-                let body = parse_expression(parser)?;
-
-                operations.push(EffectOperation {
-                    name: op_name,
-                    params,
-                    body,
-                });
-
-                // 如果有逗号，消费它
-                parser.match_token(&[TokenType::Comma]);
-            }
-
-            parser.consume(TokenType::RightBrace, "Expect '}' after effect operations")?;
-
-            handlers.push(EffectHandler {
-                effect_name,
-                operations,
-            });
-        } else if parser.match_token(&[TokenType::Return]) {
-            // 解析返回处理器
-            parser.consume(TokenType::Colon, "Expect ':' after 'return'")?;
-            parser.consume(TokenType::LeftParen, "Expect '(' after ':'")?;
-
-            let param_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
-                name.clone()
-            } else {
-                return Err(ParseError::UnexpectedToken {
-                    expected: "parameter name".to_string(),
-                    found: format!("{:?}", parser.peek().token_type),
-                    line: parser.peek().line,
-                    column: parser.peek().column,
-                });
-            };
-            parser.advance();
-
-            parser.consume(TokenType::RightParen, "Expect ')' after parameter")?;
-            parser.consume(TokenType::FatArrow, "Expect '=>' after parameter")?;
-
-            let body = parse_expression(parser)?;
-
-            return_handler = Some(Box::new(ReturnHandler {
-                param: param_name,
-                body: Box::new(body),
-            }));
-
-            // 如果有逗号，消费它
-            parser.match_token(&[TokenType::Comma]);
-        } else {
-            return Err(ParseError::UnexpectedToken {
-                expected: "'effect' or 'return'".to_string(),
-                found: format!("{:?}", parser.peek().token_type),
-                line: parser.peek().line,
-                column: parser.peek().column,
-            });
-        }
-    }
-
-    parser.consume(TokenType::RightBrace, "Expect '}' after handle body")?;
-
-    Ok(Expr::Handle(Box::new(expr), handlers, return_handler))
-}
-
-fn parse_match(parser: &mut Parser) -> Result<Expr, ParseError> {
-    // 解析被匹配的表达式
-    let expr = parse_expression(parser)?;
-
-    parser.consume(TokenType::LeftBrace, "Expect '{' after expression in match")?;
-
-    // 解析匹配分支
-    let mut cases = Vec::new();
-
-    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-        // 解析模式
-        let pattern_name = if let TokenType::Identifier(name) = &parser.peek().token_type {
-            name.clone()
-        } else {
-            return Err(ParseError::UnexpectedToken {
-                expected: "pattern name".to_string(),
-                found: format!("{:?}", parser.peek().token_type),
-                line: parser.peek().line,
-                column: parser.peek().column,
-            });
-        };
-        parser.advance();
-
-        // 解析模式参数
-        let pattern_params = if parser.match_token(&[TokenType::LeftParen]) {
-            let mut params = Vec::new();
-
-            if !parser.check(&TokenType::RightParen) {
-                loop {
-                    // 递归解析嵌套模式
-                    let sub_pattern_name =
-                        if let TokenType::Identifier(name) = &parser.peek().token_type {
-                            name.clone()
-                        } else {
-                            return Err(ParseError::UnexpectedToken {
-                                expected: "pattern parameter name".to_string(),
-                                found: format!("{:?}", parser.peek().token_type),
-                                line: parser.peek().line,
-                                column: parser.peek().column,
-                            });
-                        };
-                    parser.advance();
-
-                    // 简化处理，不支持嵌套模式参数
-                    params.push(Pattern {
-                        name: sub_pattern_name,
-                        params: None,
-                    });
-
-                    if !parser.match_token(&[TokenType::Comma]) {
-                        break;
-                    }
-                }
-            }
-
-            parser.consume(TokenType::RightParen, "Expect ')' after pattern parameters")?;
-
-            Some(params)
-        } else {
-            None
-        };
-
-        let pattern = Pattern {
-            name: pattern_name,
-            params: pattern_params,
-        };
-
-        parser.consume(TokenType::FatArrow, "Expect '=>' after pattern")?;
-
-        // 解析分支体
-        let body = parse_expression(parser)?;
-
-        cases.push(MatchCase { pattern, body });
-
-        // 消费逗号（如果有）
-        parser.match_token(&[TokenType::Comma]);
-    }
-
-    parser.consume(TokenType::RightBrace, "Expect '}' after match cases")?;
-
-    Ok(Expr::Match(Box::new(expr), cases))
-}
-
-// 添加解析对象字面量的函数
-fn parse_object_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
-    let mut fields = Vec::new();
-
-    if !parser.check(&TokenType::RightBrace) {
-        loop {
-            // 解析键（支持字符串字面量和标识符）
-            let key = if let TokenType::String(s) = &parser.peek().token_type {
-                let s = s.clone();
-                parser.advance();
-                s
-            } else if let TokenType::Identifier(name) = &parser.peek().token_type {
-                let name = name.clone();
-                parser.advance();
-                name
-            } else {
-                return Err(ParseError::UnexpectedToken {
-                    expected: "string or identifier".to_string(),
-                    found: format!("{:?}", parser.peek().token_type),
-                    line: parser.peek().line,
-                    column: parser.peek().column,
-                });
-            };
-
-            // 解析冒号
-            parser.consume(TokenType::Colon, "Expect ':' after object key")?;
-
-            // 解析值
-            let value = parse_expression(parser)?;
-
-            fields.push((key, value));
-
-            if !parser.match_token(&[TokenType::Comma]) {
-                break;
-            }
-        }
-    }
-
-    parser.consume(TokenType::RightBrace, "Expect '}' after object literal")?;
-
-    Ok(Expr::Literal(Literal::Object(fields)))
-}
-
-// 添加解析索引访问的函数（在 parse_call 函数中调用）
-fn parse_index_access(parser: &mut Parser, expr: Expr) -> Result<Expr, ParseError> {
-    // 解析索引表达式
-    let index = parse_expression(parser)?;
-
-    // 消费右方括号
-    parser.consume(TokenType::RightBracket, "Expect ']' after index")?;
-
-    // 创建索引访问表达式（使用二元操作符实现）
-    Ok(Expr::Binary(
-        Box::new(expr),
-        BinaryOp::Index,
-        Box::new(index),
-    ))
-}
-
-fn parse_match_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
-    let value = parse_expression(parser)?;
-
-    parser.consume(TokenType::LeftBrace, "Expect '{' after match value")?;
-
-    let mut cases = Vec::new();
-
-    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
-        let pattern = parse_pattern(parser)?;
-
-        parser.consume(TokenType::Arrow, "Expect '=>' after pattern")?;
-
-        let body = parse_expression(parser)?;
-
-        cases.push(crate::ast::MatchCase { pattern, body });
-
-        // 如果有逗号，消耗它
-        parser.match_token(&[TokenType::Comma]);
-    }
-
-    parser.consume(TokenType::RightBrace, "Expect '}' after match cases")?;
-
-    Ok(Expr::Match(Box::new(value), cases))
-}
-
-// 添加解析模式的函数
-fn parse_pattern(parser: &mut Parser) -> Result<crate::ast::Pattern, ParseError> {
-    if let TokenType::Identifier(name) = &parser.peek().token_type {
-        let name = name.clone();
-        parser.advance();
-
-        // 检查是否有参数列表
-        if parser.match_token(&[TokenType::LeftParen]) {
-            let mut params = Vec::new();
-
-            // 解析参数
-            if !parser.check(&TokenType::RightParen) {
-                loop {
-                    let param = parse_pattern(parser)?;
-                    params.push(param);
-
-                    if !parser.match_token(&[TokenType::Comma]) {
-                        break;
-                    }
-                }
-            }
-
-            parser.consume(TokenType::RightParen, "Expect ')' after pattern parameters")?;
-
-            Ok(crate::ast::Pattern {
-                name,
-                params: Some(params),
-            })
-        } else {
-            // 没有参数的简单模式
-            Ok(crate::ast::Pattern { name, params: None })
-        }
-    } else {
-        Err(ParseError::UnexpectedToken {
-            expected: "pattern".to_string(),
-            found: format!("{:?}", parser.peek().token_type),
-            line: parser.peek().line,
-            column: parser.peek().column,
-        })
-    }
-}
-
-// 添加对块表达式的解析支持
-fn parse_block_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
-    parser.consume(
-        TokenType::LeftBrace,
-        "Expect '{' at the beginning of a block",
-    )?;
-
-    let (statements, expr) = parse_block_contents(parser)?;
-
-    Ok(Expr::Block(statements, expr))
 }
