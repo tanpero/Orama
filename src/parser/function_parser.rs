@@ -124,8 +124,17 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
             };
 
             if parser.match_token(&[TokenType::FatArrow]) {
-                let body = parse_expression(parser)?;
-                return Ok(Expr::Function(params, Box::new(body)));
+                // 检查是否是块函数体
+                if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon) {
+                    // 是块函数体，不是对象字面量
+                    parser.advance(); // 消费左大括号
+                    let (stmts, expr) = parse_block_contents(parser)?;
+                    return Ok(Expr::Function(params, Box::new(Expr::Block(stmts, expr))));
+                } else {
+                    // 普通表达式函数体
+                    let body = parse_expression(parser)?;
+                    return Ok(Expr::Function(params, Box::new(body)));
+                }
             } else if parser.match_token(&[TokenType::LeftBrace]) {
                 // 支持块状函数体
                 let (stmts, expr) = parse_block_contents(parser)?;
@@ -151,8 +160,18 @@ pub fn parse_parenthesized_expr_or_function(parser: &mut Parser) -> Result<Expr,
                         name,
                         type_annotation: None,
                     };
-                    let body = parse_expression(parser)?;
-                    return Ok(Expr::Function(vec![param], Box::new(body)));
+                    
+                    // 检查是否是块函数体
+                    if parser.check(&TokenType::LeftBrace) && !parser.check_ahead(1, &TokenType::Colon) {
+                        // 是块函数体，不是对象字面量
+                        parser.advance(); // 消费左大括号
+                        let (stmts, expr) = parse_block_contents(parser)?;
+                        return Ok(Expr::Function(vec![param], Box::new(Expr::Block(stmts, expr))));
+                    } else {
+                        // 普通表达式函数体
+                        let body = parse_expression(parser)?;
+                        return Ok(Expr::Function(vec![param], Box::new(body)));
+                    }
                 } else {
                     return Err(ParseError::InvalidSyntax(
                         "Expected parameter name".to_string(),
