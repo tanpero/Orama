@@ -1,27 +1,27 @@
-// 导出子模块
-mod types;
-mod env;
-mod subst;
-mod error;
-mod checker;
+pub mod types;
+pub mod env;
+pub mod subst;
+pub mod error;
+pub mod checker;
+pub mod expr;
+pub mod stmt;
+pub mod pattern;
+pub mod literal;
+pub mod unify;
 
-// 重新导出主要类型和函数
-pub use types::{Type, TypeVarId};
-pub use env::TypeEnv;
-pub use subst::TypeSubst;
-pub use error::{TypeError, TypeResult};
 pub use checker::TypeChecker;
+use crate::ast::{Literal, Expr, Stmt};
+use error::TypeResult;
+use types::Type;
 
-// 提供一个简单的类型检查入口函数
-use crate::ast::{Stmt, Literal, Expr};
-
+// Export these functions for external use
 pub fn typecheck(stmts: &[Stmt]) -> TypeResult<Type> {
     let mut checker = TypeChecker::new();
     checker.init_builtins();
     checker.infer_program(stmts)
 }
 
-// 导出辅助函数，用于外部模块调用
+// Add this function to fix the error in expr_parser.rs
 pub fn check_literal(lit: &Literal) -> TypeResult<Type> {
     let checker = TypeChecker::new();
     checker.check_literal(lit)
