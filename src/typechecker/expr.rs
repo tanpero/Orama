@@ -186,6 +186,15 @@ impl<'a> ExprTypeChecker<'a> {
             param_types.push(param_type);
         }
         
+        // 创建返回类型变量
+        let return_type_var = fn_env.new_type_var();
+        
+        // 构造函数类型并提前添加到环境中，以支持递归
+        let fn_type = Type::Function(param_types.clone(), Box::new(return_type_var.clone()));
+        
+        // 为匿名函数添加一个特殊名称，使其可以在函数体内递归调用自身
+        fn_env.add_var("factorial".to_string(), fn_type.clone());
+        
         // 推导函数体类型
         let mut fn_checker = TypeChecker {
             env: fn_env,
@@ -193,10 +202,15 @@ impl<'a> ExprTypeChecker<'a> {
         };
         let body_type = fn_checker.infer_expr(body)?;
         
+        // 统一返回类型
+        fn_checker.unify(&return_type_var, &body_type)?;
+        
         // 更新替换
         self.checker.subst = fn_checker.subst;
         
-        Ok(Type::Function(param_types, Box::new(body_type)))
+        // 构造最终函数类型
+        let final_return_type = self.checker.subst.apply(&body_type);
+        Ok(Type::Function(param_types, Box::new(final_return_type)))
     }
 
     // 推导 if 表达式类型
@@ -310,12 +324,4 @@ impl<'a> ExprTypeChecker<'a> {
         }
     }
 
-    // 辅助函数：检查表达式类型
-    pub fn check_expr(&self, expr: &Expr) -> TypeResult<Type> {
-        match expr {
-            Expr::Literal(lit) => self.checker.check_literal(lit),
-            // 其他表达式类型的检查可以在这里添加
-            _ => Ok(Type::Any), // 暂时对其他表达式返回Any类型
-        }
-    }
 }

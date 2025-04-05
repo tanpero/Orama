@@ -100,8 +100,74 @@ impl TypeChecker {
 
     // 推导语句类型 - 委托给 StmtTypeChecker
     pub fn infer_stmt(&mut self, stmt: &Stmt) -> TypeResult<()> {
-        let mut stmt_checker = StmtTypeChecker::new(self);
-        stmt_checker.infer_stmt(stmt)
+        match stmt {
+            Stmt::FunctionDecl(_, _, _) => {
+                let mut stmt_checker = StmtTypeChecker::new(self);
+                stmt_checker.infer_stmt(stmt)
+            }
+            Stmt::VariableDecl(_, _, _) => {
+                let mut stmt_checker = StmtTypeChecker::new(self);
+                stmt_checker.infer_stmt(stmt)
+            }
+            Stmt::EffectDecl(_, _, _) => {
+                let mut stmt_checker = StmtTypeChecker::new(self);
+                stmt_checker.infer_stmt(stmt)
+            }
+            Stmt::TypeDecl(_, _, _) => {
+                let mut stmt_checker = StmtTypeChecker::new(self);
+                stmt_checker.infer_stmt(stmt)
+            }
+            Stmt::Expression(_) => {
+                let mut stmt_checker = StmtTypeChecker::new(self);
+                stmt_checker.infer_stmt(stmt)
+            }
+            Stmt::FunctionDecl(name, params, body) => {
+                // 创建新的类型环境用于函数定义
+                let mut fn_env = self.env.clone_with_non_generic();
+                
+                // 处理函数参数
+                let mut param_types = Vec::new();
+                for param in params {
+                    let param_type = if let Some(annotation) = &param.type_annotation {
+                        self.convert_type_annotation(annotation)?
+                    } else {
+                        fn_env.new_type_var()
+                    };
+                    fn_env.add_var(param.name.clone(), param_type.clone());
+                    param_types.push(param_type);
+                }
+                
+                // 创建返回类型变量
+                let return_type_var = fn_env.new_type_var();
+                
+                // 构造函数类型并提前添加到环境中，以支持递归
+                let fn_type = Type::Function(param_types.clone(), Box::new(return_type_var.clone()));
+                self.env.add_var(name.clone(), fn_type.clone());
+                fn_env.add_var(name.clone(), fn_type);
+                
+                // 推导函数体类型
+                let mut fn_checker = TypeChecker {
+                    env: fn_env,
+                    subst: self.subst.clone(),
+                };
+                let body_type = fn_checker.infer_expr(body)?;
+                
+                // 统一返回类型
+                fn_checker.unify(&return_type_var, &body_type)?;
+                
+                // 更新替换
+                self.subst = fn_checker.subst;
+                
+                // 更新环境中的函数类型
+                let final_return_type = self.subst.apply(&body_type);
+                let final_fn_type = Type::Function(param_types, Box::new(final_return_type));
+                self.env.add_var(name.clone(), final_fn_type);
+                
+                Ok(())
+            }
+            
+            // ... 其他语句类型的处理保持不变 ...
+        }
     }
 
     // 推导模式类型 - 委托给 PatternTypeChecker
@@ -262,4 +328,6 @@ impl TypeChecker {
             }
         }
     }
+
 }
+

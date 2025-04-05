@@ -16,7 +16,51 @@ impl<'a> StmtTypeChecker<'a> {
     // 推导语句类型
     pub fn infer_stmt(&mut self, stmt: &Stmt) -> TypeResult<()> {
         match stmt {
-            Stmt::FunctionDecl(name, params, body) => self.infer_function_decl(name, params, body),
+            Stmt::FunctionDecl(name, params, body) => {
+                // 创建新的类型环境用于函数定义
+                let mut fn_env = self.checker.env.clone_with_non_generic();
+                
+                // 处理函数参数
+                let mut param_types = Vec::new();
+                for param in params {
+                    let param_type = if let Some(annotation) = &param.type_annotation {
+                        self.checker.convert_type_annotation(annotation)?
+                    } else {
+                        fn_env.new_type_var()
+                    };
+                    fn_env.add_var(param.name.clone(), param_type.clone());
+                    param_types.push(param_type);
+                }
+                
+                // 创建返回类型变量
+                let return_type_var = fn_env.new_type_var();
+                
+                // 构造函数类型并提前添加到环境中，以支持递归
+                let fn_type = Type::Function(param_types.clone(), Box::new(return_type_var.clone()));
+                self.checker.env.add_var(name.clone(), fn_type.clone());
+                fn_env.add_var(name.clone(), fn_type);
+                
+                // 推导函数体类型
+                let mut fn_checker = TypeChecker {
+                    env: fn_env,
+                    subst: self.checker.subst.clone(),
+                };
+                let body_type = fn_checker.infer_expr(body)?;
+                
+                // 统一返回类型
+                fn_checker.unify(&return_type_var, &body_type)?;
+                
+                // 更新替换
+                self.checker.subst = fn_checker.subst;
+                
+                // 更新环境中的函数类型
+                let final_return_type = self.checker.subst.apply(&body_type);
+                let final_fn_type = Type::Function(param_types, Box::new(final_return_type));
+                self.checker.env.add_var(name.clone(), final_fn_type);
+                
+                Ok(())
+            }
+            
             Stmt::VariableDecl(name, type_annotation, initializer) => self.infer_variable_decl(name, type_annotation, initializer),
             Stmt::TypeDecl(name, type_params, type_def) => self.infer_type_decl(name, type_params, type_def),
             Stmt::EffectDecl(name, _, _) => {

@@ -26,6 +26,7 @@ pub struct Parser {
     current: usize,
 }
 
+// 在Parser实现中添加这些方法
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser { tokens, current: 0 }
@@ -92,6 +93,20 @@ impl Parser {
             return false;
         }
         &self.peek().token_type == token_type
+    }
+
+    pub fn check_next(&self, token_type: &TokenType) -> bool {
+        if self.current + 1 >= self.tokens.len() {
+            return false;
+        }
+        &self.tokens[self.current + 1].token_type == token_type
+    }
+    
+    pub fn check_ahead(&self, n: usize, token_type: &TokenType) -> bool {
+        if self.current + n >= self.tokens.len() {
+            return false;
+        }
+        &self.tokens[self.current + n].token_type == token_type
     }
 
     pub fn match_token(&mut self, types: &[TokenType]) -> bool {

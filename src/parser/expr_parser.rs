@@ -12,6 +12,24 @@ use crate::parser::type_parser::parse_type_annotation;
 use crate::parser::Stmt;
 
 pub fn parse_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
+    // 检查是否是函数表达式
+    if parser.check(&TokenType::LeftParen) && parser.check_next(&TokenType::RightParen) && 
+       (parser.check_ahead(2, &TokenType::FatArrow) || parser.check_ahead(2, &TokenType::LeftBrace)) {
+        // 解析空参数函数
+        parser.advance(); // 消费左括号
+        parser.advance(); // 消费右括号
+        
+        if parser.match_token(&[TokenType::FatArrow]) {
+            // 箭头函数
+            let body = parse_expression(parser)?;
+            return Ok(Expr::Function(Vec::new(), Box::new(body)));
+        } else if parser.match_token(&[TokenType::LeftBrace]) {
+            // 块函数
+            let (stmts, expr) = parse_block_contents(parser)?;
+            return Ok(Expr::Function(Vec::new(), Box::new(Expr::Block(stmts, expr))));
+        }
+    }
+    
     parse_pipe(parser)
 }
 
@@ -206,7 +224,6 @@ fn parse_array_literal(parser: &mut Parser) -> Result<Expr, ParseError> {
     }
 }
 
-// 在 parse_primary 函数中添加对 match 表达式的支持
 fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
     if parser.match_token(&[TokenType::False]) {
         return Ok(Expr::Literal(Literal::Boolean(false)));
@@ -257,6 +274,10 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
             if parser.match_token(&[TokenType::FatArrow]) {
                 let body = parse_expression(parser)?;
                 return Ok(Expr::Function(Vec::new(), Box::new(body)));
+            } else if parser.match_token(&[TokenType::LeftBrace]) {
+                // 支持块状函数体（空参数情况）
+                let (stmts, expr) = parse_block_contents(parser)?;
+                return Ok(Expr::Function(Vec::new(), Box::new(Expr::Block(stmts, expr))));
             }
             return Ok(Expr::Literal(Literal::Unit)); // 返回单元类型
         } else {
@@ -321,10 +342,14 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                 if parser.match_token(&[TokenType::FatArrow]) {
                     let body = parse_expression(parser)?;
                     return Ok(Expr::Function(params, Box::new(body)));
+                } else if parser.match_token(&[TokenType::LeftBrace]) {
+                    // 支持块状函数体
+                    let (stmts, expr) = parse_block_contents(parser)?;
+                    return Ok(Expr::Function(params, Box::new(Expr::Block(stmts, expr))));
                 } else {
                     // 不是函数定义，回退到表达式解析
                     return Err(ParseError::UnexpectedToken {
-                        expected: "'=>'".to_string(),
+                        expected: "'=>' or '{'".to_string(),
                         found: format!("{:?}", parser.peek().token_type),
                         line: parser.peek().line,
                         column: parser.peek().column,
@@ -351,8 +376,17 @@ fn parse_primary(parser: &mut Parser) -> Result<Expr, ParseError> {
                             parser.previous().column,
                         ));
                     }
+                } else if parser.match_token(&[TokenType::LeftBrace]) && matches!(expr, Expr::Variable(_)) {
+                    // 支持块状函数体（单参数情况）
+                    if let Expr::Variable(name) = expr {
+                        let param = Parameter {
+                            name,
+                            type_annotation: None,
+                        };
+                        let (stmts, expr) = parse_block_contents(parser)?;
+                        return Ok(Expr::Function(vec![param], Box::new(Expr::Block(stmts, expr))));
+                    }
                 }
-                
                 return Ok(expr);
             }
         }
@@ -395,35 +429,34 @@ fn parse_if_expression(parser: &mut Parser) -> Result<Expr, ParseError> {
 }
 
 // 新增函数：解析块内容
+// 在文件末尾添加这个新函数
 fn parse_block_contents(parser: &mut Parser) -> Result<(Vec<Stmt>, Option<Box<Expr>>), ParseError> {
     let mut statements = Vec::new();
+    let mut last_expr = None;
     
-    // 如果块为空，直接返回
-    if parser.check(&TokenType::RightBrace) {
-        parser.advance(); // 消费右花括号
-        return Ok((statements, None));
+    while !parser.check(&TokenType::RightBrace) && !parser.is_at_end() {
+        // 尝试解析语句
+        if parser.check(&TokenType::Let) || 
+           parser.check(&TokenType::Effect) || 
+           parser.check(&TokenType::Type) {
+            statements.push(parser.statement()?);
+        } else {
+            // 如果不是语句开始标记，则解析表达式
+            let expr = parse_expression(parser)?;
+            
+            // 检查是否是块中的最后一个表达式
+            if parser.check(&TokenType::RightBrace) {
+                last_expr = Some(Box::new(expr));
+            } else {
+                // 否则将其作为表达式语句添加
+                statements.push(Stmt::Expression(expr));
+            }
+        }
     }
     
-    // 解析块中的语句和表达式
-    loop {
-        // 检查是否到达块的结尾
-        if parser.check(&TokenType::RightBrace) {
-            parser.advance(); // 消费右花括号
-            return Ok((statements, None));
-        }
-        
-        // 解析一个语句或表达式
-        let expr = parser.expression()?;
-        
-        // 检查是否是块的最后一个表达式
-        if parser.check(&TokenType::RightBrace) {
-            parser.advance(); // 消费右花括号
-            return Ok((statements, Some(Box::new(expr))));
-        }
-        
-        // 不是最后一个表达式，将其作为语句添加
-        statements.push(Stmt::Expression(expr));
-    }
+    parser.consume(TokenType::RightBrace, "Expect '}' after block")?;
+    
+    Ok((statements, last_expr))
 }
 
 fn parse_block(parser: &mut Parser) -> Result<Expr, ParseError> {
