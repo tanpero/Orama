@@ -1,16 +1,16 @@
-pub mod types;
-pub mod env;
-pub mod subst;
-pub mod error;
 pub mod checker;
+pub mod env;
+pub mod error;
 pub mod expr;
-pub mod stmt;
-pub mod pattern;
 pub mod literal;
+pub mod pattern;
+pub mod stmt;
+pub mod subst;
+pub mod types;
 pub mod unify;
 
+use crate::ast::{Expr, Literal, Stmt};
 pub use checker::TypeChecker;
-use crate::ast::{Literal, Expr, Stmt};
 use error::TypeResult;
 use types::Type;
 

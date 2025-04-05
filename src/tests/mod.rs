@@ -1,29 +1,27 @@
-use std::fs;
-use std::path::Path;
+use crate::evaluator::Evaluator;
 use crate::lexer;
 use crate::parser;
-use crate::evaluator::Evaluator;
 use crate::runtime::Value;
 use crate::stdlib;
+use std::fs;
+use std::path::Path;
 
 // 测试辅助函数：执行代码并返回结果
 fn execute_code(code: &str) -> Result<Value, String> {
     match lexer::lex(code) {
-        Ok(tokens) => {
-            match parser::parse(tokens) {
-                Ok(program) => {
-                    let stdlib_env = stdlib::create_stdlib();
-                    let mut evaluator = Evaluator::with_environment(stdlib_env);
-                    
-                    match evaluator.evaluate(&program) {
-                        Ok(value) => Ok(value),
-                        Err(e) => Err(format!("运行时错误: {}", e))
-                    }
-                },
-                Err(e) => Err(format!("语法错误: {}", e))
+        Ok(tokens) => match parser::parse(tokens) {
+            Ok(program) => {
+                let stdlib_env = stdlib::create_stdlib();
+                let mut evaluator = Evaluator::with_environment(stdlib_env);
+
+                match evaluator.evaluate(&program) {
+                    Ok(value) => Ok(value),
+                    Err(e) => Err(format!("运行时错误: {}", e)),
+                }
             }
+            Err(e) => Err(format!("语法错误: {}", e)),
         },
-        Err(e) => Err(format!("词法错误: {}", e))
+        Err(e) => Err(format!("词法错误: {}", e)),
     }
 }
 
@@ -31,7 +29,7 @@ fn execute_code(code: &str) -> Result<Value, String> {
 fn execute_file(filename: &str) -> Result<Value, String> {
     match fs::read_to_string(filename) {
         Ok(source) => execute_code(&source),
-        Err(e) => Err(format!("无法读取文件 '{}': {}", filename, e))
+        Err(e) => Err(format!("无法读取文件 '{}': {}", filename, e)),
     }
 }
 
@@ -51,7 +49,7 @@ fn assert_value_eq(actual: &Value, expected: &Value) -> bool {
                 }
             }
             true
-        },
+        }
         (Value::Object(a), Value::Object(b)) => {
             if a.len() != b.len() {
                 return false;
@@ -66,9 +64,9 @@ fn assert_value_eq(actual: &Value, expected: &Value) -> bool {
                 }
             }
             true
-        },
+        }
         (Value::Null, Value::Null) => true,
-        _ => false
+        _ => false,
     }
 }
 
@@ -86,10 +84,10 @@ mod tests {
             let z = x + y
             z
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(15.0)));
-        
+
         // 字符串操作
         let code = r#"
             let greeting = "Hello"
@@ -97,10 +95,13 @@ mod tests {
             let message = greeting + " " + name
             message
         "#;
-        
+
         let result = execute_code(code).unwrap();
-        assert!(assert_value_eq(&result, &Value::String("Hello Orama".to_string())));
-        
+        assert!(assert_value_eq(
+            &result,
+            &Value::String("Hello Orama".to_string())
+        ));
+
         // 布尔值和条件表达式
         let code = r#"
             let a = true
@@ -110,11 +111,11 @@ mod tests {
             let result = if d { "yes" } else { "no" }
             result
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::String("yes".to_string())));
     }
-    
+
     #[test]
     fn test_functions() {
         // 简单函数
@@ -122,10 +123,10 @@ mod tests {
             let add = (a, b) => a + b
             add(3, 4)
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(7.0)));
-        
+
         // 递归函数
         let code = r#"
             let factorial = (n) => 
@@ -136,21 +137,21 @@ mod tests {
                 }
             factorial(5)
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(120.0)));
-        
+
         // 闭包和高阶函数
         let code = r#"
             let makeAdder = (x) => (y) => x + y
             let add5 = makeAdder(5)
             add5(10)
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(15.0)));
     }
-    
+
     #[test]
     fn test_blocks_and_scopes() {
         // 块作用域
@@ -163,7 +164,7 @@ mod tests {
             }
             [x, result]
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert!(assert_value_eq(&values[0], &Value::Number(10.0)));
@@ -172,7 +173,7 @@ mod tests {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_data_structures() {
         // 数组
@@ -181,10 +182,10 @@ mod tests {
             let sum = arr[0] + arr[1] + arr[2] + arr[3] + arr[4]
             sum
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(15.0)));
-        
+
         // 对象
         let code = r#"
             let person = {
@@ -194,11 +195,14 @@ mod tests {
             }
             person.greet("Hello")
         "#;
-        
+
         let result = execute_code(code).unwrap();
-        assert!(assert_value_eq(&result, &Value::String("Hello Alice".to_string())));
+        assert!(assert_value_eq(
+            &result,
+            &Value::String("Hello Alice".to_string())
+        ));
     }
-    
+
     #[test]
     fn test_higher_order_functions() {
         // map 函数
@@ -217,7 +221,7 @@ mod tests {
             let doubled = map(numbers, (x) => x * 2)
             doubled
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 5);
@@ -226,7 +230,7 @@ mod tests {
         } else {
             panic!("Expected array result");
         }
-        
+
         // filter 函数
         let code = r#"
             let filter = (arr, predicate) => {
@@ -245,7 +249,7 @@ mod tests {
             let evens = filter(numbers, (x) => x % 2 == 0)
             evens
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 2);
@@ -255,7 +259,7 @@ mod tests {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_pipe_operator() {
         // 管道操作符
@@ -267,11 +271,11 @@ mod tests {
             let result = 5 |> double |> increment |> square
             result
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(121.0)));
     }
-    
+
     #[test]
     fn test_algebraic_effects() {
         // 简单的状态效应
@@ -304,7 +308,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 3);
@@ -314,7 +318,7 @@ mod tests {
         } else {
             panic!("Expected array result");
         }
-        
+
         // 异常效应
         let code = r#"
             effect Exception {
@@ -344,7 +348,7 @@ mod tests {
             
             result
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 3);
@@ -355,7 +359,7 @@ mod tests {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_pattern_matching() {
         // 简单模式匹配
@@ -371,10 +375,10 @@ mod tests {
             
             result
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(84.0)));
-        
+
         // 复杂模式匹配
         let code = r#"
             type List<T> = | Nil() | Cons(T, List<T>)
@@ -388,11 +392,11 @@ mod tests {
             
             sum(list)
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(6.0)));
     }
-    
+
     #[test]
     fn test_type_system() {
         // 简单类型定义和使用
@@ -417,10 +421,10 @@ mod tests {
             let p2 = createPoint(3, 4)
             distance(p1, p2)
         "#;
-        
+
         let result = execute_code(code).unwrap();
         assert!(assert_value_eq(&result, &Value::Number(5.0)));
-        
+
         // 泛型类型
         let code = r#"
             type Pair<A, B> = {
@@ -442,17 +446,20 @@ mod tests {
             let swapped = swap(pair)
             [swapped.first, swapped.second]
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 2);
-            assert!(assert_value_eq(&values[0], &Value::String("hello".to_string())));
+            assert!(assert_value_eq(
+                &values[0],
+                &Value::String("hello".to_string())
+            ));
             assert!(assert_value_eq(&values[1], &Value::Number(42.0)));
         } else {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_error_handling() {
         // 使用 Option 类型处理错误
@@ -477,7 +484,7 @@ mod tests {
             
             [getOrDefault(result1, 0), getOrDefault(result2, 0)]
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 2);
@@ -486,7 +493,7 @@ mod tests {
         } else {
             panic!("Expected array result");
         }
-        
+
         // 使用 Result 类型处理错误
         let code = r#"
             type Result<T, E> = | Ok(T) | Err(E)
@@ -509,7 +516,7 @@ mod tests {
             
             [unwrapOr(result1, 0), unwrapOr(result2, 0)]
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 2);
@@ -519,7 +526,7 @@ mod tests {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_composition() {
         // 函数组合
@@ -534,7 +541,7 @@ mod tests {
             
             [doubleAndIncrement(5), incrementAndDouble(5)]
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 2);
@@ -544,7 +551,7 @@ mod tests {
             panic!("Expected array result");
         }
     }
-    
+
     #[test]
     fn test_immutability() {
         // 不可变数据结构
@@ -567,7 +574,7 @@ mod tests {
             
             [user.age, updatedUser.age]
         "#;
-        
+
         let result = execute_code(code).unwrap();
         if let Value::Array(values) = result {
             assert_eq!(values.len(), 2);

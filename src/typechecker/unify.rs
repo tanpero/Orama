@@ -1,6 +1,6 @@
-use crate::typechecker::types::{Type, TypeVarId};
-use crate::typechecker::error::{TypeError, TypeResult};
 use crate::typechecker::checker::TypeChecker;
+use crate::typechecker::error::{TypeError, TypeResult};
+use crate::typechecker::types::{Type, TypeVarId};
 
 pub struct UnifyTypeChecker<'a> {
     checker: &'a mut TypeChecker,
@@ -21,14 +21,10 @@ impl<'a> UnifyTypeChecker<'a> {
             (a, b) if a == b => Ok(()),
 
             // 类型变量的情况
-            (Type::Var(id), ty) | (ty, Type::Var(id)) => {
-                self.unify_var(*id, ty.clone())
-            }
+            (Type::Var(id), ty) | (ty, Type::Var(id)) => self.unify_var(*id, ty.clone()),
 
             // 数组类型
-            (Type::Array(a), Type::Array(b)) => {
-                self.unify(a, b)
-            }
+            (Type::Array(a), Type::Array(b)) => self.unify(a, b),
 
             // 函数类型
             (Type::Function(params1, ret1), Type::Function(params2, ret2)) => {
@@ -76,11 +72,11 @@ impl<'a> UnifyTypeChecker<'a> {
                         format!("{}", t2),
                     ));
                 }
-                
+
                 for (a1, a2) in args1.iter().zip(args2.iter()) {
                     self.unify(a1, a2)?;
                 }
-                
+
                 Ok(())
             }
 
@@ -120,15 +116,11 @@ impl<'a> UnifyTypeChecker<'a> {
             Type::Var(id) => *id == var_id,
             Type::Array(elem) => Self::occurs_check(var_id, elem),
             Type::Function(params, ret) => {
-                params.iter().any(|p| Self::occurs_check(var_id, p)) || 
-                Self::occurs_check(var_id, ret)
+                params.iter().any(|p| Self::occurs_check(var_id, p))
+                    || Self::occurs_check(var_id, ret)
             }
-            Type::Record(fields) => {
-                fields.values().any(|f| Self::occurs_check(var_id, f))
-            }
-            Type::Generic(_, args) => {
-                args.iter().any(|a| Self::occurs_check(var_id, a))
-            }
+            Type::Record(fields) => fields.values().any(|f| Self::occurs_check(var_id, f)),
+            Type::Generic(_, args) => args.iter().any(|a| Self::occurs_check(var_id, a)),
             _ => false,
         }
     }

@@ -101,7 +101,7 @@ impl Parser {
         }
         &self.tokens[self.current + 1].token_type == token_type
     }
-    
+
     pub fn check_ahead(&self, n: usize, token_type: &TokenType) -> bool {
         if self.current + n >= self.tokens.len() {
             return false;

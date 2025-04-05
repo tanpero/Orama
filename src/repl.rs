@@ -1,22 +1,16 @@
+use crate::ast::Program;
+use crate::ast::*;
+use crate::evaluator::Evaluator;
 use crate::lexer;
 use crate::parser;
-use crate::evaluator::Evaluator;
-use crate::ast::Program;
 use crate::stdlib;
-use colored::*;
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
-use crate::ast::*;
-use crate::typechecker::TypeChecker;
-use crate::token::TokenType::{
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-};
 use crate::token::Token;
 use crate::token::TokenType;
-
+use crate::token::TokenType::{LeftBrace, LeftParen, RightBrace, RightParen};
+use crate::typechecker::TypeChecker;
+use colored::*;
+use rustyline::Editor;
+use rustyline::error::ReadlineError;
 
 pub fn run_repl() {
     println!("{}", "Orama 语言 REPL".bright_green().bold());
@@ -25,11 +19,12 @@ pub fn run_repl() {
     println!("{}", "输入 '.ast' 切换 AST 显示模式".cyan());
     println!("{}", "输入 '.eval' 切换求值模式".cyan());
 
-    let mut rl = Editor::<(), rustyline::history::FileHistory>::new().expect("Failed to create line editor");
+    let mut rl =
+        Editor::<(), rustyline::history::FileHistory>::new().expect("Failed to create line editor");
     let mut input_buffer = String::new();
     let mut continuation = false;
     let mut show_ast = false;
-    
+
     // 创建标准库环境
     let stdlib_env = stdlib::create_stdlib();
     let mut evaluator = Evaluator::with_environment(stdlib_env.clone());
@@ -37,20 +32,20 @@ pub fn run_repl() {
     // 创建并初始化类型检查器，保持其状态
     let mut type_checker = TypeChecker::new();
     type_checker.init_builtins();
-    
+
     // 将标准库函数添加到类型检查器中
     type_checker.init_stdlib(&stdlib_env);
-    
+
     loop {
-        let prompt = if continuation { 
-            "... ".to_string() 
-        } else { 
-            ">>> ".to_string() 
+        let prompt = if continuation {
+            "... ".to_string()
+        } else {
+            ">>> ".to_string()
         };
-        
+
         // 使用 rustyline 的 colored prompt 支持
         let readline_result = rl.readline_with_initial(&prompt, ("", ""));
-        
+
         // 处理读取输入的结果
         if let Err(e) = &readline_result {
             match e {
@@ -68,13 +63,13 @@ pub fn run_repl() {
                 }
             }
         }
-        
+
         // 如果读取成功，处理输入
         let line = match readline_result {
             Ok(line) => line,
             Err(_) => continue, // 已经处理过错误，这里直接跳过
         };
-        
+
         // 添加历史记录，处理可能的错误
         if let Err(e) = rl.add_history_entry(line.as_str()) {
             println!("{}: 无法添加历史记录: {:?}", "警告".yellow().bold(), e);
@@ -85,7 +80,14 @@ pub fn run_repl() {
             break;
         } else if line.trim() == ".ast" {
             show_ast = !show_ast;
-            println!("AST 显示模式: {}", if show_ast { "开启".green() } else { "关闭".red() });
+            println!(
+                "AST 显示模式: {}",
+                if show_ast {
+                    "开启".green()
+                } else {
+                    "关闭".red()
+                }
+            );
             continue;
         } else if line.trim() == ".eval" {
             show_ast = false;
@@ -101,7 +103,7 @@ pub fn run_repl() {
             continue;
         } else {
             input_buffer.push_str(&line);
-            
+
             // 检查括号是否匹配，如果不匹配则自动续行
             let tokens_result = lexer::lex(&input_buffer);
             if let Ok(tokens) = tokens_result {
@@ -111,7 +113,7 @@ pub fn run_repl() {
                     continue;
                 }
             }
-            
+
             continuation = false;
         }
 
@@ -119,13 +121,13 @@ pub fn run_repl() {
         if continuation {
             continue;
         }
-        
+
         // 检查输入是否为空或只包含空白字符
         if input_buffer.trim().is_empty() {
             input_buffer.clear();
             continue;
         }
-        
+
         // 词法分析
         let tokens_result = lexer::lex(&input_buffer);
         if let Err(e) = &tokens_result {
@@ -133,16 +135,16 @@ pub fn run_repl() {
             input_buffer.clear();
             continue;
         }
-        
+
         // 获取词法分析结果
         let tokens = tokens_result.unwrap();
-        
+
         // 检查是否只有注释或空白
         if tokens.is_empty() {
             input_buffer.clear();
             continue;
         }
-        
+
         // 语法分析
         let ast_result = parser::parse(tokens);
         if let Err(e) = &ast_result {
@@ -155,10 +157,10 @@ pub fn run_repl() {
             input_buffer.clear();
             continue;
         }
-        
+
         // 获取 AST
         let ast = ast_result.unwrap();
-        
+
         // 根据模式显示 AST 或执行代码
         if show_ast {
             println!("{}", "AST:".yellow().bold());
@@ -167,26 +169,29 @@ pub fn run_repl() {
             // 使用保持状态的类型检查器，而不是每次创建新的
             match type_checker.infer_program(&ast.statements) {
                 Ok(_) => {
-                    
                     // 执行程序
                     let eval_result = evaluator.evaluate(&ast);
                     match eval_result {
                         Ok(value) => {
                             if !matches!(value, crate::runtime::Value::Null) {
-                                println!("{} {}", "=>".bright_blue().bold(), format!("{}", stdlib::format_value(&value)).bright_white());
+                                println!(
+                                    "{} {}",
+                                    "=>".bright_blue().bold(),
+                                    format!("{}", stdlib::format_value(&value)).bright_white()
+                                );
                             }
-                        },
+                        }
                         Err(e) => {
                             println!("{}: {}", "运行时错误".red().bold(), e);
                         }
                     }
-                },
+                }
                 Err(type_error) => {
                     println!("{}: {}", "类型错误".red().bold(), type_error);
                 }
             }
         }
-        
+
         // 清空输入缓冲区，准备下一次输入
         input_buffer.clear();
     }
@@ -197,7 +202,7 @@ fn needs_continuation(tokens: &[Token]) -> bool {
     let mut open_parens = 0;
     let mut open_braces = 0;
     let mut open_brackets = 0;
-    
+
     for token in tokens {
         match token.token_type {
             TokenType::LeftParen => open_parens += 1,
@@ -205,23 +210,23 @@ fn needs_continuation(tokens: &[Token]) -> bool {
                 if open_parens > 0 {
                     open_parens -= 1;
                 }
-            },
+            }
             TokenType::LeftBrace => open_braces += 1,
             TokenType::RightBrace => {
                 if open_braces > 0 {
                     open_braces -= 1;
                 }
-            },
+            }
             TokenType::LeftBracket => open_brackets += 1,
             TokenType::RightBracket => {
                 if open_brackets > 0 {
                     open_brackets -= 1;
                 }
-            },
+            }
             _ => {}
         }
     }
-    
+
     // 如果有任何未闭合的括号，则需要续行
     open_parens > 0 || open_braces > 0 || open_brackets > 0
 }
@@ -241,11 +246,21 @@ fn print_stmt(stmt: &Stmt, indent: usize) {
     let indent_str = "  ".repeat(indent);
     match stmt {
         Stmt::VariableDecl(name, type_ann, expr) => {
-            println!("{}{}({}) = ", indent_str, "变量声明".blue().bold(), name.yellow());
+            println!(
+                "{}{}({}) = ",
+                indent_str,
+                "变量声明".blue().bold(),
+                name.yellow()
+            );
             print_expr(expr, indent + 1);
         }
         Stmt::FunctionDecl(name, params, body) => {
-            println!("{}{}({}) 参数: ", indent_str, "函数声明".blue().bold(), name.yellow());
+            println!(
+                "{}{}({}) 参数: ",
+                indent_str,
+                "函数声明".blue().bold(),
+                name.yellow()
+            );
             for param in params {
                 println!("{}  {} {}", indent_str, "参数:".cyan(), param.name.yellow());
                 if let Some(type_ann) = &param.type_annotation {
@@ -258,9 +273,21 @@ fn print_stmt(stmt: &Stmt, indent: usize) {
             print_expr(body, indent + 2);
         }
         Stmt::EffectDecl(name, type_params, signatures) => {
-            print!("{}{}({}) ", indent_str, "效应声明".blue().bold(), name.yellow());
+            print!(
+                "{}{}({}) ",
+                indent_str,
+                "效应声明".blue().bold(),
+                name.yellow()
+            );
             if let Some(params) = type_params {
-                print!("类型参数: [{}] ", params.iter().map(|p| p.yellow().to_string()).collect::<Vec<_>>().join(", "));
+                print!(
+                    "类型参数: [{}] ",
+                    params
+                        .iter()
+                        .map(|p| p.yellow().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
             println!();
             for sig in signatures {
@@ -271,9 +298,21 @@ fn print_stmt(stmt: &Stmt, indent: usize) {
             }
         }
         Stmt::TypeDecl(name, type_params, type_def) => {
-            print!("{}{}({}) ", indent_str, "类型声明".blue().bold(), name.yellow());
+            print!(
+                "{}{}({}) ",
+                indent_str,
+                "类型声明".blue().bold(),
+                name.yellow()
+            );
             if let Some(params) = type_params {
-                print!("类型参数: [{}] ", params.iter().map(|p| p.yellow().to_string()).collect::<Vec<_>>().join(", "));
+                print!(
+                    "类型参数: [{}] ",
+                    params
+                        .iter()
+                        .map(|p| p.yellow().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
             println!();
             match type_def {
@@ -284,7 +323,12 @@ fn print_stmt(stmt: &Stmt, indent: usize) {
                         if let Some(params) = &variant.params {
                             println!(" 参数:");
                             for param in params {
-                                println!("{}      {} {}", indent_str, "参数:".cyan(), param.name.yellow());
+                                println!(
+                                    "{}      {} {}",
+                                    indent_str,
+                                    "参数:".cyan(),
+                                    param.name.yellow()
+                                );
                                 if let Some(type_ann) = &param.type_annotation {
                                     print!("{}        {}: ", indent_str, "类型".cyan());
                                     print_type_annotation(type_ann, indent + 4);
@@ -317,30 +361,28 @@ fn print_stmt(stmt: &Stmt, indent: usize) {
 fn print_expr(expr: &Expr, indent: usize) {
     let indent_str = "  ".repeat(indent);
     match expr {
-        Expr::Literal(lit) => {
-            match lit {
-                Literal::Unit => println!("{}{}", indent_str, "单元值".magenta()),
-                Literal::Number(n) => println!("{}{}: {}", indent_str, "数字".magenta(), n),
-                Literal::String(s) => println!("{}{}: \"{}\"", indent_str, "字符串".magenta(), s),
-                Literal::Boolean(b) => println!("{}{}: {}", indent_str, "布尔值".magenta(), b),
-                Literal::Array(items) => {
-                    println!("{}{}: [", indent_str, "数组".magenta());
-                    for item in items {
-                        print_expr(item, indent + 1);
-                    }
-                    println!("{}]", indent_str);
+        Expr::Literal(lit) => match lit {
+            Literal::Unit => println!("{}{}", indent_str, "单元值".magenta()),
+            Literal::Number(n) => println!("{}{}: {}", indent_str, "数字".magenta(), n),
+            Literal::String(s) => println!("{}{}: \"{}\"", indent_str, "字符串".magenta(), s),
+            Literal::Boolean(b) => println!("{}{}: {}", indent_str, "布尔值".magenta(), b),
+            Literal::Array(items) => {
+                println!("{}{}: [", indent_str, "数组".magenta());
+                for item in items {
+                    print_expr(item, indent + 1);
                 }
-                Literal::Object(props) => {
-                    println!("{}{}: {{", indent_str, "对象".magenta());
-                    for (key, value) in props {
-                        println!("{}  {}: ", indent_str, key.yellow());
-                        print_expr(value, indent + 2);
-                    }
-                    println!("{}}}", indent_str);
-                }
-                Literal::Null => println!("{}{}", indent_str, "null".magenta()),
+                println!("{}]", indent_str);
             }
-        }
+            Literal::Object(props) => {
+                println!("{}{}: {{", indent_str, "对象".magenta());
+                for (key, value) in props {
+                    println!("{}  {}: ", indent_str, key.yellow());
+                    print_expr(value, indent + 2);
+                }
+                println!("{}}}", indent_str);
+            }
+            Literal::Null => println!("{}{}", indent_str, "null".magenta()),
+        },
         Expr::Variable(name) => {
             println!("{}{}: {}", indent_str, "变量".magenta(), name.yellow());
         }
@@ -368,7 +410,12 @@ fn print_expr(expr: &Expr, indent: usize) {
         }
         Expr::Binary(left, op, right) => {
             println!("{}{}: ", indent_str, "二元操作".magenta());
-            println!("{}  {}: {}", indent_str, "操作符".cyan(), format_binary_op(op));
+            println!(
+                "{}  {}: {}",
+                indent_str,
+                "操作符".cyan(),
+                format_binary_op(op)
+            );
             println!("{}  {}: ", indent_str, "左操作数".cyan());
             print_expr(left, indent + 2);
             println!("{}  {}: ", indent_str, "右操作数".cyan());
@@ -376,7 +423,12 @@ fn print_expr(expr: &Expr, indent: usize) {
         }
         Expr::Unary(op, operand) => {
             println!("{}{}: ", indent_str, "一元操作".magenta());
-            println!("{}  {}: {}", indent_str, "操作符".cyan(), format_unary_op(op));
+            println!(
+                "{}  {}: {}",
+                indent_str,
+                "操作符".cyan(),
+                format_unary_op(op)
+            );
             println!("{}  {}: ", indent_str, "操作数".cyan());
             print_expr(operand, indent + 2);
         }
@@ -410,7 +462,12 @@ fn print_expr(expr: &Expr, indent: usize) {
             print_expr(expr, indent + 2);
             println!("{}  {}: ", indent_str, "分支".cyan());
             for case in cases {
-                println!("{}    {}: {} ", indent_str, "模式".cyan(), case.pattern.name.yellow());
+                println!(
+                    "{}    {}: {} ",
+                    indent_str,
+                    "模式".cyan(),
+                    case.pattern.name.yellow()
+                );
                 if let Some(params) = &case.pattern.params {
                     print!("参数: [");
                     for (i, param) in params.iter().enumerate() {
@@ -427,7 +484,12 @@ fn print_expr(expr: &Expr, indent: usize) {
         }
         Expr::Perform(effect, operation, args) => {
             println!("{}{}: ", indent_str, "效应操作".magenta());
-            println!("{}  效应: {} 操作: {}", indent_str, effect.yellow(), operation.yellow());
+            println!(
+                "{}  效应: {} 操作: {}",
+                indent_str,
+                effect.yellow(),
+                operation.yellow()
+            );
             if !args.is_empty() {
                 println!("{}  {}: ", indent_str, "参数".cyan());
                 for arg in args {
@@ -443,17 +505,27 @@ fn print_expr(expr: &Expr, indent: usize) {
             for handler in handlers {
                 println!("{}    效应: {}", indent_str, handler.effect_name.yellow());
                 for op in &handler.operations {
-                    println!("{}      操作: {} 参数: [{}]", 
-                        indent_str, 
+                    println!(
+                        "{}      操作: {} 参数: [{}]",
+                        indent_str,
                         op.name.yellow(),
-                        op.params.iter().map(|p| p.name.yellow().to_string()).collect::<Vec<_>>().join(", ")
+                        op.params
+                            .iter()
+                            .map(|p| p.name.yellow().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     );
                     println!("{}        {}: ", indent_str, "操作体".cyan());
                     print_expr(&op.body, indent + 4);
                 }
             }
             if let Some(ret_handler) = return_handler {
-                println!("{}  {}: {} ", indent_str, "返回处理".cyan(), ret_handler.param.yellow());
+                println!(
+                    "{}  {}: {} ",
+                    indent_str,
+                    "返回处理".cyan(),
+                    ret_handler.param.yellow()
+                );
                 println!("{}    {}: ", indent_str, "处理体".cyan());
                 print_expr(&ret_handler.body, indent + 2);
             }

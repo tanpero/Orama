@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::typechecker::types::{Type, TypeVarId};
+use std::collections::HashMap;
 
 // 类型替换
 #[derive(Debug, Clone)]
@@ -25,9 +25,7 @@ impl TypeSubst {
                     ty.clone()
                 }
             }
-            Type::Array(elem_ty) => {
-                Type::Array(Box::new(self.apply(elem_ty)))
-            }
+            Type::Array(elem_ty) => Type::Array(Box::new(self.apply(elem_ty))),
             Type::Function(param_tys, return_ty) => {
                 let new_params = param_tys.iter().map(|p| self.apply(p)).collect();
                 let new_return = Box::new(self.apply(return_ty));
@@ -51,12 +49,12 @@ impl TypeSubst {
     // 组合两个替换
     pub fn compose(&self, other: &TypeSubst) -> TypeSubst {
         let mut result = self.clone();
-        
+
         for (id, ty) in &other.0 {
             let new_ty = self.apply(ty);
             result.0.insert(*id, new_ty);
         }
-        
+
         result
     }
 }

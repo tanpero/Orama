@@ -1,7 +1,7 @@
+use crate::ast::Expr;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
-use crate::ast::{Expr};
 
 // 运行时值类型
 // 在 Value 枚举中添加 NativeFunction 变体
@@ -51,18 +51,18 @@ impl Environment {
             enclosing: None,
         }
     }
-    
+
     pub fn with_enclosing(enclosing: Rc<RefCell<Environment>>) -> Self {
         Environment {
             values: HashMap::new(),
             enclosing: Some(enclosing),
         }
     }
-    
+
     pub fn define(&mut self, name: String, value: Value) {
         self.values.insert(name, value);
     }
-    
+
     pub fn get(&self, name: &str) -> Option<Value> {
         if let Some(value) = self.values.get(name) {
             Some(value.clone())
@@ -72,7 +72,7 @@ impl Environment {
             None
         }
     }
-    
+
     pub fn assign(&mut self, name: &str, value: Value) -> bool {
         if self.values.contains_key(name) {
             self.values.insert(name.to_string(), value);
@@ -83,7 +83,7 @@ impl Environment {
             false
         }
     }
-    
+
     // Add this getter method for enclosing environment
     pub fn get_enclosing(&self) -> Option<Rc<RefCell<Environment>>> {
         self.enclosing.clone()
@@ -95,13 +95,13 @@ impl Environment {
 pub enum RuntimeError {
     #[error("未定义的变量: {0}")]
     UndefinedVariable(String),
-    
+
     #[error("类型错误: {0}")]
     TypeError(String),
-    
+
     #[error("未处理的效应: {0}.{1}")]
     UnhandledEffect(String, String),
-    
+
     #[error("参数数量不匹配: 期望 {expected}, 实际 {actual}")]
     ArgumentMismatch { expected: usize, actual: usize },
 
@@ -110,7 +110,7 @@ pub enum RuntimeError {
 
     #[error("无效的操作: {0}")]
     IOError(String),
-    
+
     #[error("运行时错误: {0}")]
     Generic(String),
 }
@@ -139,7 +139,7 @@ impl Value {
                     }
                 }
                 true
-            },
+            }
             (Value::Object(a), Value::Object(b)) => {
                 if a.len() != b.len() {
                     return false;
@@ -150,12 +150,12 @@ impl Value {
                             if !val.is_equal(other_val) {
                                 return false;
                             }
-                        },
+                        }
                         None => return false,
                     }
                 }
                 true
-            },
+            }
             // 函数、原生函数和效应不进行比较，总是返回 false
             _ => false,
         }

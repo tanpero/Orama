@@ -1,22 +1,24 @@
-use crate::ast::{Expr, Literal, TypeAnnotation, BinaryOp, UnaryOp, Stmt, Parameter, Pattern, MatchCase};
-use crate::typechecker::types::{Type, TypeVarId};
-use crate::typechecker::env::TypeEnv;
-use crate::typechecker::subst::TypeSubst;
-use crate::typechecker::error::{TypeError, TypeResult};
-use std::collections::HashMap;
 use crate::ast::TypeDefinition;
-use crate::runtime::Value;
-use std::rc::Rc;
-use std::cell::RefCell;
+use crate::ast::{
+    BinaryOp, Expr, Literal, MatchCase, Parameter, Pattern, Stmt, TypeAnnotation, UnaryOp,
+};
 use crate::runtime::Environment;
+use crate::runtime::Value;
+use crate::typechecker::env::TypeEnv;
+use crate::typechecker::error::{TypeError, TypeResult};
+use crate::typechecker::subst::TypeSubst;
+use crate::typechecker::types::{Type, TypeVarId};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 // 导入拆分出去的模块
 use crate::typechecker::expr::ExprTypeChecker;
-use crate::typechecker::stmt::StmtTypeChecker;
-use crate::typechecker::pattern::PatternTypeChecker;
 use crate::typechecker::literal::LiteralTypeChecker;
-use crate::typechecker::unify::UnifyTypeChecker;
 use crate::typechecker::literal::MutableLiteralTypeChecker;
+use crate::typechecker::pattern::PatternTypeChecker;
+use crate::typechecker::stmt::StmtTypeChecker;
+use crate::typechecker::unify::UnifyTypeChecker;
 
 // 类型检查器
 pub struct TypeChecker {
@@ -72,13 +74,14 @@ impl TypeChecker {
                 }
             }
             TypeAnnotation::Function(fn_type) => {
-                let param_types = fn_type.params
+                let param_types = fn_type
+                    .params
                     .iter()
                     .map(|param| self.convert_type_annotation(param))
                     .collect::<Result<Vec<_>, _>>()?;
-                
+
                 let return_type = Box::new(self.convert_type_annotation(&fn_type.return_type)?);
-                
+
                 Ok(Type::Function(param_types, return_type))
             }
             TypeAnnotation::Effect(_, return_type) => {
@@ -124,7 +127,7 @@ impl TypeChecker {
             Stmt::FunctionDecl(name, params, body) => {
                 // 创建新的类型环境用于函数定义
                 let mut fn_env = self.env.clone_with_non_generic();
-                
+
                 // 处理函数参数
                 let mut param_types = Vec::new();
                 for param in params {
@@ -136,37 +139,36 @@ impl TypeChecker {
                     fn_env.add_var(param.name.clone(), param_type.clone());
                     param_types.push(param_type);
                 }
-                
+
                 // 创建返回类型变量
                 let return_type_var = fn_env.new_type_var();
-                
+
                 // 构造函数类型并提前添加到环境中，以支持递归
-                let fn_type = Type::Function(param_types.clone(), Box::new(return_type_var.clone()));
+                let fn_type =
+                    Type::Function(param_types.clone(), Box::new(return_type_var.clone()));
                 self.env.add_var(name.clone(), fn_type.clone());
                 fn_env.add_var(name.clone(), fn_type);
-                
+
                 // 推导函数体类型
                 let mut fn_checker = TypeChecker {
                     env: fn_env,
                     subst: self.subst.clone(),
                 };
                 let body_type = fn_checker.infer_expr(body)?;
-                
+
                 // 统一返回类型
                 fn_checker.unify(&return_type_var, &body_type)?;
-                
+
                 // 更新替换
                 self.subst = fn_checker.subst;
-                
+
                 // 更新环境中的函数类型
                 let final_return_type = self.subst.apply(&body_type);
                 let final_fn_type = Type::Function(param_types, Box::new(final_return_type));
                 self.env.add_var(name.clone(), final_fn_type);
-                
+
                 Ok(())
-            }
-            
-            // ... 其他语句类型的处理保持不变 ...
+            } // ... 其他语句类型的处理保持不变 ...
         }
     }
 
@@ -206,7 +208,7 @@ impl TypeChecker {
         for stmt in stmts.iter().take(stmts.len() - 1) {
             self.infer_stmt(stmt)?;
         }
-        
+
         // 最后一个语句的类型作为程序的类型
         if let Some(last) = stmts.last() {
             match last {
@@ -228,7 +230,7 @@ impl TypeChecker {
                 // 为每个类型参数创建新的类型变量
                 let mut subst = TypeSubst::new();
                 let mut new_args = Vec::new();
-                
+
                 for arg in type_args {
                     if let Type::Var(id) = arg {
                         let new_var = self.env.new_type_var();
@@ -238,37 +240,33 @@ impl TypeChecker {
                         new_args.push(self.instantiate_generic(arg));
                     }
                 }
-                
+
                 Type::Generic(name.clone(), new_args)
-            },
+            }
             Type::Function(params, ret) => {
-                let new_params = params.iter()
-                    .map(|p| self.instantiate_generic(p))
-                    .collect();
+                let new_params = params.iter().map(|p| self.instantiate_generic(p)).collect();
                 let new_ret = Box::new(self.instantiate_generic(ret));
                 Type::Function(new_params, new_ret)
-            },
-            Type::Array(elem) => {
-                Type::Array(Box::new(self.instantiate_generic(elem)))
-            },
+            }
+            Type::Array(elem) => Type::Array(Box::new(self.instantiate_generic(elem))),
             Type::Record(fields) => {
                 let mut new_fields = HashMap::new();
                 for (name, field_type) in fields {
                     new_fields.insert(name.clone(), self.instantiate_generic(field_type));
                 }
                 Type::Record(new_fields)
-            },
+            }
             // 其他类型直接返回
             _ => generic_type.clone(),
         }
     }
-    
+
     // 辅助函数：检查字面量类型
     pub fn check_literal(&self, lit: &Literal) -> TypeResult<Type> {
         let literal_checker = LiteralTypeChecker::new(self);
         literal_checker.check_literal(lit)
     }
-    
+
     // 辅助函数：检查表达式类型
     pub fn check_expr(&self, expr: &Expr) -> TypeResult<Type> {
         match expr {
@@ -282,30 +280,27 @@ impl TypeChecker {
     pub fn init_stdlib(&mut self, stdlib_env: &Rc<RefCell<Environment>>) {
         // 从标准库环境中获取所有函数名和值
         let env = stdlib_env.borrow();
-        
+
         // 直接访问环境中的值
         for (name, value) in env.values.iter() {
             // 根据函数的参数和返回类型创建函数类型
             match value {
                 Value::NativeFunction(native_fn) => {
                     // 为每个参数创建类型变量
-                    let param_types: Vec<Type> = native_fn.params.iter()
-                        .map(|_| Type::Any)
-                        .collect();
-                    
+                    let param_types: Vec<Type> =
+                        native_fn.params.iter().map(|_| Type::Any).collect();
+
                     // 创建函数类型并添加到环境
                     let fn_type = Type::Function(param_types, Box::new(Type::Any));
                     self.env.add_var(name.clone(), fn_type);
-                },
+                }
                 Value::Function(func) => {
                     // 为用户定义的函数创建类型
-                    let param_types: Vec<Type> = func.params.iter()
-                        .map(|_| Type::Any)
-                        .collect();
-                    
+                    let param_types: Vec<Type> = func.params.iter().map(|_| Type::Any).collect();
+
                     let fn_type = Type::Function(param_types, Box::new(Type::Any));
                     self.env.add_var(name.clone(), fn_type);
-                },
+                }
                 // 对于非函数值，添加具体类型
                 Value::Number(_) => self.env.add_var(name.clone(), Type::Number),
                 Value::String(_) => self.env.add_var(name.clone(), Type::String),
@@ -322,12 +317,11 @@ impl TypeChecker {
                             _ => Type::Any,
                         }
                     };
-                    self.env.add_var(name.clone(), Type::Array(Box::new(elem_type)));
-                },
+                    self.env
+                        .add_var(name.clone(), Type::Array(Box::new(elem_type)));
+                }
                 _ => self.env.add_var(name.clone(), Type::Any),
             }
         }
     }
-
 }
-

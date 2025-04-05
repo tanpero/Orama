@@ -1,7 +1,7 @@
 use crate::ast::Literal;
-use crate::typechecker::types::Type;
-use crate::typechecker::error::{TypeError, TypeResult};
 use crate::typechecker::checker::TypeChecker;
+use crate::typechecker::error::{TypeError, TypeResult};
+use crate::typechecker::types::Type;
 use std::collections::HashMap;
 
 // Regular struct without generic mutability
@@ -28,10 +28,10 @@ impl<'a> LiteralTypeChecker<'a> {
                     // Empty array, return Any type array
                     return Ok(Type::Array(Box::new(Type::Any)));
                 }
-                
+
                 // Check first element type
                 let first_type = self.checker.check_expr(&elements[0])?;
-                
+
                 // Check all other elements match the first type
                 for element in elements.iter().skip(1) {
                     let element_type = self.checker.check_expr(element)?;
@@ -42,9 +42,9 @@ impl<'a> LiteralTypeChecker<'a> {
                         });
                     }
                 }
-                
+
                 Ok(Type::Array(Box::new(first_type)))
-            },
+            }
             Literal::Object(fields) => {
                 let mut field_types = HashMap::new();
                 for (name, value) in fields {
@@ -52,7 +52,7 @@ impl<'a> LiteralTypeChecker<'a> {
                     field_types.insert(name.clone(), value_type);
                 }
                 Ok(Type::Record(field_types))
-            },
+            }
         }
     }
 }
@@ -84,24 +84,24 @@ impl<'a> MutableLiteralTypeChecker<'a> {
                 } else {
                     // Infer first element type
                     let first_type = self.checker.infer_expr(&elements[0])?;
-                    
+
                     // Ensure all elements have consistent types
                     for elem in elements.iter().skip(1) {
                         let elem_type = self.checker.infer_expr(elem)?;
                         self.checker.unify(&first_type, &elem_type)?;
                     }
-                    
+
                     Ok(Type::Array(Box::new(first_type)))
                 }
             }
             Literal::Object(fields) => {
                 let mut field_types = HashMap::new();
-                
+
                 for (name, value) in fields {
                     let value_type = self.checker.infer_expr(value)?;
                     field_types.insert(name.clone(), value_type);
                 }
-                
+
                 Ok(Type::Record(field_types))
             }
         }

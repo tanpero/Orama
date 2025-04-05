@@ -1,10 +1,10 @@
 mod ast;
+mod evaluator;
 mod lexer;
 mod parser;
-mod evaluator;
+mod repl;
 mod runtime;
 mod stdlib;
-mod repl;
 mod token;
 mod typechecker;
 
@@ -14,7 +14,7 @@ use std::process;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() > 1 {
         // 如果提供了文件名，则运行文件
         let filename = &args[1];
@@ -37,10 +37,11 @@ fn run_file(filename: &str) {
                                 Ok(_) => {
                                     // 创建标准库环境
                                     let stdlib_env = stdlib::create_stdlib();
-                                    let mut evaluator = evaluator::Evaluator::with_environment(stdlib_env);
-                                    
+                                    let mut evaluator =
+                                        evaluator::Evaluator::with_environment(stdlib_env);
+
                                     match evaluator.evaluate(&program) {
-                                        Ok(_) => {},
+                                        Ok(_) => {}
                                         Err(e) => {
                                             eprintln!("运行时错误: {}", e);
                                             process::exit(1);

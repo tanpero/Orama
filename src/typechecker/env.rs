@@ -1,5 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use crate::typechecker::types::{Type, TypeVarId};
+use std::collections::{HashMap, HashSet};
 
 // 类型环境
 #[derive(Debug, Clone)]
@@ -27,10 +27,15 @@ impl TypeEnv {
     // 添加递归类型定义
     pub fn add_recursive_type(&mut self, name: String, type_params: Vec<String>, type_def: Type) {
         // 先添加一个占位符类型
-        let placeholder = Type::Generic(name.clone(), 
-            type_params.iter().map(|p| Type::Var(TypeVarId(0))).collect());
+        let placeholder = Type::Generic(
+            name.clone(),
+            type_params
+                .iter()
+                .map(|p| Type::Var(TypeVarId(0)))
+                .collect(),
+        );
         self.types.insert(name.clone(), placeholder);
-        
+
         // 然后添加实际类型定义
         self.types.insert(name, type_def);
     }

@@ -145,7 +145,7 @@ impl Lexer {
                     c,
                     self.line,
                     self.column - 1,
-                ))
+                ));
             }
         }
 
@@ -246,13 +246,7 @@ impl Lexer {
                     '"' => value.push('"'),
                     '\\' => value.push('\\'),
                     '0' => value.push('\0'),
-                    c => {
-                        return Err(LexerError::InvalidEscapeSequence(
-                            c,
-                            self.line,
-                            self.column,
-                        ))
-                    }
+                    c => return Err(LexerError::InvalidEscapeSequence(c, self.line, self.column)),
                 }
             } else {
                 value.push(self.peek());
