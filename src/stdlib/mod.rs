@@ -89,9 +89,26 @@ pub fn format_value(value: &Value) -> String {
             format!("{{{}}}: Object", fields_str.join(", "))
         }
         Value::Function(f) => {
-            // 为函数生成更详细的类型签名
-            let params = f.params.join(", ");
-            format!("({}) => <...>: Function", params)
+            // Fix: Check if param_types vector is empty instead of using Some pattern
+            let param_types_str = if !f.param_types.is_empty() {
+                f.param_types.iter().enumerate().map(|(i, t)| {
+                    if let Some(t) = t {
+                        format!("{}: {}", f.params.get(i).unwrap_or(&"_".to_string()), t)
+                    } else {
+                        format!("{}: Any", f.params.get(i).unwrap_or(&"_".to_string()))
+                    }
+                }).collect::<Vec<_>>().join(", ")
+            } else {
+                f.params.iter().map(|p| format!("{}: Any", p)).collect::<Vec<_>>().join(", ")
+            };
+            
+            let return_type = if let Some(ret) = &f.return_type {
+                ret.to_string()
+            } else {
+                "Any".to_string()
+            };
+            
+            format!("({}) => {}: Function", param_types_str, return_type)
         }
         Value::NativeFunction(f) => {
             let params = f.params.join(", ");

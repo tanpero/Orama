@@ -45,14 +45,21 @@ impl Evaluator {
             }
             Stmt::FunctionDecl(name, params, body) => {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
+                
+                // Fix: Use a custom conversion function instead of to_string()
+                let param_types = params.iter().map(|p| {
+                    p.type_annotation.as_ref().map(|t| self.type_annotation_to_string(t))
+                }).collect();
+                
+                // Create function object with type information
                 let function = Function {
-                    param_types: Vec::new(), // 添加缺失的字段
-                    return_type: None,       // 添加缺失的字段
                     params: param_names,
                     body: Rc::new(body.clone()),
                     closure: Rc::clone(&self.environment),
+                    param_types,  // Save parameter type annotations
+                    return_type: None,  // Return type might need to be obtained from type checker
                 };
-
+                
                 self.environment
                     .borrow_mut()
                     .define(name.clone(), Value::Function(function));
@@ -156,12 +163,18 @@ impl Evaluator {
             }
             Expr::Function(params, body) => {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
+                
+                // Fix: Use a custom conversion function instead of to_string()
+                let param_types = params.iter().map(|p| {
+                    p.type_annotation.as_ref().map(|t| self.type_annotation_to_string(t))
+                }).collect();
+                
                 let function = Function {
-                    param_types: Vec::new(), // 初始化参数类型为空向量
-                    return_type: None,       // 初始化返回类型为 None
                     params: param_names,
                     body: Rc::new(*body.clone()),
                     closure: Rc::clone(&self.environment),
+                    param_types,
+                    return_type: None,
                 };
 
                 Ok(Value::Function(function))
@@ -511,4 +524,45 @@ impl Evaluator {
             )),
         }
     }
+
+        
+    // Add this helper method to convert TypeAnnotation to String
+    // Fix the type_annotation_to_string method to correctly handle TypeAnnotation::Function
+    fn type_annotation_to_string(&self, annotation: &crate::ast::TypeAnnotation) -> String {
+        match annotation {
+            crate::ast::TypeAnnotation::Simple(name, type_args) => {
+                if let Some(args) = type_args {
+                    if !args.is_empty() {
+                        let args_str: Vec<String> = args
+                            .iter()
+                            .map(|arg| self.type_annotation_to_string(arg))
+                            .collect();
+                        format!("{}<{}>", name, args_str.join(", "))
+                    } else {
+                        name.clone()
+                    }
+                } else {
+                    name.clone()
+                }
+            }
+            crate::ast::TypeAnnotation::Function(function_type) => {
+                // Correctly access the fields of FunctionType
+                let params_str: Vec<String> = function_type.params
+                    .iter()
+                    .map(|param| self.type_annotation_to_string(param))
+                    .collect();
+                let ret_str = self.type_annotation_to_string(&function_type.return_type);
+                format!("({}) => {}", params_str.join(", "), ret_str)
+            }
+            crate::ast::TypeAnnotation::Array(elem_type) => {
+                format!("[{}]", self.type_annotation_to_string(elem_type))
+            }
+            crate::ast::TypeAnnotation::Effect(effects, return_type) => {
+                let effects_str = effects.join(", ");
+                let ret_str = self.type_annotation_to_string(return_type);
+                format!("{{{}}}: {}", effects_str, ret_str)
+            }
+        }
+    }
+
 }
